@@ -1,0 +1,2004 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<ruleset name="Code Style"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+        强制特定编码风格的规则。
+    </description>
+
+    <rule name="AtLeastOneConstructor"
+          language="java"
+          since="1.04"
+          message="每个类应声明至少一个构造函数。"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.AtLeastOneConstructorRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#atleastoneconstructor">
+        <description>
+<![CDATA[
+每个非静态类应声明至少一个构造函数。仅包含静态成员的类被忽略，详情请参考[UseUtilityClassRule](pmd_rules_java_design.html#useutilityclass)以检测这些类。
+]]>
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Foo {
+   // missing constructor
+  public void doSomething() { ... }
+  public void doOtherThing { ... }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidDollarSigns"
+          language="java"
+          since="1.5"
+          message="避免在变量、方法、类和接口名称中使用美元符号（$）"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#avoiddollarsigns">
+        <description>
+避免在变量、方法、类和接口名称中使用美元符号（$）。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+      //ClassDeclaration           [contains(@SimpleName, '$')]
+    | //EnumDeclaration            [contains(@SimpleName, '$')]
+    | //AnnotationTypeDeclaration  [contains(@SimpleName, '$')]
+    | //RecordDeclaration          [contains(@SimpleName, '$')]
+    | //VariableId                 [contains(@Name, '$')]
+    | //MethodDeclaration          [contains(@Name, '$')]
+
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Fo$o {  // not a recommended name
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidProtectedFieldInFinalClass"
+          language="java"
+          since="2.1"
+          message="避免在最终类中使用受保护的字段。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#avoidprotectedfieldinfinalclass">
+        <description>
+由于最终类不能被继承，因此使用受保护的字段没有意义。建议使用私有或包访问修饰符来明确表达意图。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ClassDeclaration[@Final = true()]
+/ClassBody
+/FieldDeclaration[@Visibility = "protected"]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public final class Bar {
+  private int x;
+  protected int y;  // bar cannot be subclassed, so is y really private or package visible?
+  Bar() {}
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidProtectedMethodInFinalClassNotExtending"
+          language="java"
+          since="5.1"
+          message="避免在最终类中使用受保护的方法，特别是当该类除了 `Object` 之外没有继承其他类时。建议将这些方法更改为私有或包访问，以明确表达意图并减少不必要的复杂性。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#avoidprotectedmethodinfinalclassnotextending">
+        <description>
+在大多数最终类中不要使用受保护的方法，因为这些类不能被继承。仅在继承了包含受保护方法的父类时才允许在最终类中使用受保护的方法（因为无法降低其可见性）。为了明确表达意图，请使用私有或包访问修饰符。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ClassDeclaration[@Final= true() and not(ExtendsList)]
+/ClassBody
+/MethodDeclaration[@Visibility="protected" and @Name != 'finalize']
+ ]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public final class Foo {
+  private int bar() {}
+  protected int baz() {} // Foo cannot be subclassed, and doesn't extend anything, so is baz() really private or package visible?
+}
+ ]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidUsingNativeCode"
+          language="java"
+          since="4.1"
+          message="不建议使用本地代码。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#avoidusingnativecode">
+        <description>
+不必要地依赖Java Native Interface (JNI) 调用会直接降低应用程序的可移植性，并增加维护负担。
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath">
+                <value>//MethodCall[TypeExpression/ClassType[pmd-java:typeIs('java.lang.System')]
+                                    and @MethodName = 'loadLibrary']</value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class SomeJNIClass {
+
+     public SomeJNIClass() {
+         System.loadLibrary("nativelib");
+     }
+
+     static {
+         System.loadLibrary("nativelib");
+     }
+
+     public void invalidCallsInMethod() throws SecurityException, NoSuchMethodException {
+         System.loadLibrary("nativelib");
+     }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="BooleanGetMethodName"
+          language="java"
+          since="4.0"
+          message="返回布尔值的 `getX()` 方法应命名为 `isX()`。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#booleangetmethodname">
+        <description>
+返回布尔结果的方法应命名为谓语语句，以表示该方法的性质。例如，`isReady()`、`hasValues()`、`canCommit()`、`willFail()` 等。避免使用 `get` 前缀来命名这些方法。
+        </description>
+        <priority>4</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodDeclaration
+    [starts-with(@Name, 'get')]
+    [@Arity = 0 or $checkParameterizedMethods = true()]
+    [ PrimitiveType[@Kind = 'boolean'] and @Overridden = false() ]
+]]>
+                </value>
+            </property>
+            <property name="checkParameterizedMethods" type="Boolean" description="Check parameterized methods" value="false"/>
+        </properties>
+        <example>
+<![CDATA[
+public boolean getFoo();            // bad
+public boolean isFoo();             // ok
+public boolean getFoo(boolean bar); // ok, unless checkParameterizedMethods=true
+]]>
+        </example>
+    </rule>
+
+    <rule name="CallSuperInConstructor"
+          language="java"
+          since="3.0"
+          message="在构造函数中调用 `super()` 是一个好的实践。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#callsuperinconstructor">
+        <description>
+如果未调用 `super()`，但调用了其他构造函数（如重载构造函数），则此规则不会报告。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ClassDeclaration[ExtendsList/*]
+  /ClassBody
+  /ConstructorDeclaration[ not(Block/ExplicitConstructorInvocation) ]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo extends Bar{
+  public Foo() {
+   // call the constructor of Bar
+   super();
+  }
+ public Foo(int code) {
+  // do something with code
+   this();
+   // no problem with this
+  }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ClassNamingConventions"
+          language="java"
+          since="1.2"
+          message="{0}的名称''{1}''不符合''{2}''的命名规范。"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.ClassNamingConventionsRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#classnamingconventions">
+        <description>
+用于类型声明的可配置命名约定。此规则报告与其特定类型（如枚举或接口）适用的正则表达式不匹配的类型声明。每个正则表达式都可以通过属性进行配置。
+
+默认情况下，此规则使用标准的Java命名约定（Pascal大小写）。
+
+该规则可以检测实用类并对其强制执行不同的命名约定。例如，通过将 `utilityClassPattern` 属性设置为 `[A-Z][a-zA-Z0-9]+(Utils?|Helper|Constants)` 来报告名称不以 "Util(s)"、"Helper" 或 "Constants" 结尾的任何实用类。
+
+对于此规则，实用类定义为：一个具体类，不从超类继承或实现任何接口，且仅有静态字段或方法。
+
+此规则使用以下约定检测测试类：测试类是顶级类，要么继承自JUnit 3的 `TestCase`，要么至少有一个使用JUnit4/5或TestNG的 `Test` 注解标记的方法。
+        </description>
+        <priority>1</priority>
+        <example>
+<![CDATA[
+// This is Pascal case, the recommended naming convention in Java
+// Note that the default values of this rule don't allow underscores
+// or accented characters in type names
+public class FooBar {}
+
+// You may want abstract classes to be named 'AbstractXXX',
+// in which case you can customize the regex for abstract
+// classes to 'Abstract[A-Z]\w+'
+public abstract class Thing {}
+
+// This class doesn't respect the convention, and will be flagged
+public class Éléphant {}
+]]>
+        </example>
+    </rule>
+
+    <rule name="CommentDefaultAccessModifier"
+          language="java"
+          since="5.4.0"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.CommentDefaultAccessModifierRule"
+          message="缺少对 {0} ''{1}'' 的注释默认访问修饰符。"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#commentdefaultaccessmodifier">
+        <description>
+为了避免错误，如果我们希望一个 Annotation、Class、Enum、Method、Constructor 或 Field 使用默认访问修饰符，我们必须在其声明开始处添加注释。默认情况下，注释应为 `/* default */` 或 `/* package */`，如果需要其他注释，则必须提供正则表达式。
+
+该规则默认忽略所有具有 `@VisibleForTesting` 注解或任何 JUnit5/TestNG 注解的情况。使用属性 "ignoredAnnotations" 可以自定义识别的注解。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Foo {
+    final String stringValue = "some string";
+    String getString() {
+       return stringValue;
+    }
+
+    class NestedFoo {
+    }
+}
+
+// should be
+public class Foo {
+    /* default */ final String stringValue = "some string";
+    /* default */ String getString() {
+       return stringValue;
+    }
+
+    /* default */ class NestedFoo {
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ConfusingTernary"
+          language="java"
+          since="1.9"
+          message="避免使用 if (x != y) ..; else ..; 这种结构。"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.ConfusingTernaryRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#confusingternary">
+        <description>
+避免在有 else 子句的 if 表达式中使用否定。例如，将代码：
+`if (x != y) diff(); else same();` 重写为： `if (x == y) same(); else diff();`.
+
+在没有 else 的 if (x != y) 语句通常用于返回语句，因此一致地使用这个规则可以使代码更易于阅读。此外，这还解决了诸如“错误情况是否应该先处理？”或“常见情况是否应该先处理？”等琐碎的排序问题。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+boolean bar(int x, int y) {
+    return (x != y) ? diff : same;
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ControlStatementBraces"
+          language="java"
+          since="6.2.0"
+          message="此语句应该使用大括号。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#controlstatementbraces">
+        <description>
+强制对控制语句使用大括号。建议在“if ... else”语句和循环语句中使用大括号，即使它们是可选的。这通常使代码更清晰，并有助于将来在需要添加其他语句时做好准备。尽管如此，这条规则允许通过属性控制哪些语句必须使用大括号。
+
+从 6.2.0 版本开始，这条规则取代了 WhileLoopMustUseBraces、ForLoopMustUseBraces、IfStmtMustUseBraces 和 IfElseStmtMustUseBraces。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="checkIfElseStmt" type="Boolean" value="true" description="Require that 'if ... else' statements use braces" />
+            <property name="checkSingleIfStmt" type="Boolean" value="true" description="Require that 'if' statements with a single branch use braces" />
+            <property name="checkWhileStmt" type="Boolean" value="true" description="Require that 'while' loops use braces" />
+            <property name="checkForStmt" type="Boolean" value="true" description="Require that 'for' loops should use braces" />
+            <property name="checkDoWhileStmt" type="Boolean" value="true" description="Require that 'do ... while' loops use braces" />
+            <property name="checkCaseStmt" type="Boolean" value="false" description="Require that cases of a switch have braces"/>
+
+            <property name="allowEmptyLoop" type="Boolean" value="false" description="Allow loops with an empty statement, e.g. 'while(true);'" />
+            <property name="xpath">
+                <value><![CDATA[
+                //WhileStatement[$checkWhileStmt and not(Block) and not($allowEmptyLoop and EmptyStatement)]
+                |
+                //ForStatement[$checkForStmt and not(Block) and not($allowEmptyLoop and EmptyStatement)]
+                |
+                //ForeachStatement[$checkForStmt and not(Block) and not($allowEmptyLoop and EmptyStatement)]
+                |
+                //DoStatement[$checkDoWhileStmt and not(Block) and not($allowEmptyLoop and EmptyStatement)]
+                |
+                (: The violation is reported on the sub statement -- not the if statement :)
+                //IfStatement[$checkIfElseStmt]
+                    /*[position() > 1 and not(self::Block or self::IfStatement)]
+                      [ $checkSingleIfStmt
+                            (: Inside this (...) is the definition of a "single if statement" :)
+                            or not(parent::*/@Else = false() (: No else stmt :)
+                                   (: Not the last branch of an 'if ... else if' chain :)
+                                   and not(parent::IfStatement[parent::IfStatement]))]
+
+                |
+                (: Reports case labels if one of their subordinate statements is not braced :)
+                //SwitchFallthroughBranch[$checkCaseStmt]
+                             [count(*) > 1 and (count(*) > 2 or not(child::*[2]/self::Block))]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+while (true)    // not recommended
+  x++;
+
+while (true) {  // preferred approach
+  x++;
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="EmptyMethodInAbstractClassShouldBeAbstract"
+          language="java"
+          since="4.1"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          message="在抽象类中，空的方法应标记为抽象方法。"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#emptymethodinabstractclassshouldbeabstract">
+        <description>
+在抽象类中，空的方法或自动生成的方法应标记为抽象方法。这有助于防止开发人员不适当地使用这些方法，并确保他们在具体子类中实现自己的版本。
+        </description>
+        <priority>1</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ClassDeclaration[@RegularClass = true() and pmd-java:modifiers() = "abstract"]
+    /ClassBody
+    /MethodDeclaration
+    [Block[
+      let $size := count(*[not(self::EmptyStatement)])
+      return $size = 0
+             or $size = 1 and ReturnStatement[ NullLiteral or NumericLiteral[@ValueAsInt = 0] or StringLiteral[@Empty = true()]]
+    ]]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public abstract class ShouldBeAbstract {
+    public Object couldBeAbstract() {
+        // Should be abstract method ?
+        return null;
+    }
+
+    public void couldBeAbstract() {
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="EmptyControlStatement"
+          language="java"
+          since="6.46.0"
+          message="该控制语句包含一个空分支。"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.EmptyControlStatementRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#emptycontrolstatement">
+        <!-- Note about naming: EmptyCodeBlock does not work because the rule flags `if(true);`  -->
+        <!-- EmptyControlStatement is weird because `{}` is not a control statement, and we also flag initializers. -->
+        <!-- EmptyStatement does not work because `;` is called an "empty statement" and is not flagged by this rule, rather, by UnnecessarySemicolon. -->
+        <!-- EmptyCodeConstruct would work but sounds a bit odd (right?). -->
+        <description><![CDATA[
+报告包含空主体的控制语句，以及空初始化器。
+
+检查的代码结构包括：
+- `try` 语句的主体
+- `try` 语句的 `finally` 子句
+- `switch` 语句
+- `synchronized` 语句
+- `if` 语句
+- 循环语句：`while`、`for`、`do .. while`
+- 初始化器
+- 作为语句使用的块（用于作用域）
+
+此规则取代了以下规则：EmptyFinallyBlock、EmptyIfStmt、EmptyInitializer、EmptyStatementBlock、EmptySwitchStatements、EmptySynchronizedBlock、EmptyTryBlock 和 EmptyWhileStmt。
+
+注意，EmptyCatchBlock 规则仍然是独立的规则。
+
+EmptyStatementNotInLoop 被 java/codestyle/UnnecessarySemicolon 规则取代。
+        ]]></description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+class Foo {
+    {
+        if (true); // empty if statement
+        if (true) { // empty as well
+        }
+    }
+
+    {} // empty initializer
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ExtendsObject"
+          language="java"
+          since="5.0"
+          message="没有必要显式地扩展 `Object`。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#extendsobject">
+        <description>没有必要显式地扩展 `Object`。</description>
+        <priority>4</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ExtendsList/ClassType[pmd-java:typeIsExactly('java.lang.Object')]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo extends Object {     // not required
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="FieldDeclarationsShouldBeAtStartOfClass"
+          language="java"
+          since="5.0"
+          message="字段应该在类的顶部声明，位于任何方法声明、构造函数、初始化器或内部类之前。"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.FieldDeclarationsShouldBeAtStartOfClassRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#fielddeclarationsshouldbeatstartofclass">
+        <description>
+字段应该在类的顶部声明，位于任何方法声明、构造函数、初始化器或内部类之前。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class HelloWorldBean {
+
+  // Field declared before methods / inner classes - OK
+  private String _thing;
+
+  public String getMessage() {
+    return "Hello World!";
+  }
+
+  // Field declared after methods / inner classes - avoid this
+  private String _fieldInWrongLocation;
+}
+]]>
+        </example>
+    </rule>
+
+
+    <rule name="FieldNamingConventions"
+          language="java"
+          since="6.7.0"
+          message="{0} 名称 ''{1}'' 不符合 ''{2}''"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.FieldNamingConventionsRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#fieldnamingconventions">
+        <description>
+可配置的字段声明命名约定。此规则报告不符合特定类型正则表达式的变量声明，例如常量（`static final`）、枚举常量、`final` 字段。每个正则表达式可以通过属性进行配置。
+
+默认情况下，此规则使用标准 Java 命名约定（驼峰命名法），并对常量和枚举常量使用全大写命名约定。
+        </description>
+        <priority>1</priority>
+        <example>
+            <![CDATA[
+            class Foo {
+                int myField = 1; // This is in camel case, so it's ok
+                int my_Field = 1; // This contains an underscore, it's not ok by default
+                                  // but you may allow it, or even require the "my_" prefix
+
+                final int FinalField = 1; // you may configure a different convention for final fields,
+                                          // e.g. here PascalCase: [A-Z][a-zA-Z0-9]*
+
+                interface Interface {
+                    double PI = 3.14; // interface "fields" use the constantPattern property
+                }
+
+                enum AnEnum {
+                    ORG, NET, COM; // These use a separate property but are set to ALL_UPPER by default
+                }
+            }
+            ]]>
+        </example>
+    </rule>
+
+    <rule name="FinalParameterInAbstractMethod"
+          language="java"
+          since="6.42.0"
+          message="抽象方法中的参数不应使用 `final` 修饰符。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          typeResolution="true"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#finalparameterinabstractmethod">
+        <description>
+为接口方法声明 `final` 参数是没有意义的，因为实现类可以选择不遵守这个限制。
+        </description>
+        <priority>1</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+//MethodDeclaration
+    [FormalParameters/FormalParameter[@Final = true()]]
+    [not(Block)]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+public interface MyInterface {
+  void process(final Object arg); // Avoid using final here
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ForLoopShouldBeWhileLoop"
+          language="java"
+          since="1.02"
+          message="这个 `for` 循环可以简化为 `while` 循环。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#forloopshouldbewhileloop">
+        <description>
+一些 `for` 循环可以简化为 `while` 循环，这样可以使代码更加简洁。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ForStatement[not(ForInit | ForUpdate) and count(*) = 2]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+    void bar() {
+        for (;true;) true; // No Init or Update part, may as well be: while (true)
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="FormalParameterNamingConventions"
+          language="java"
+          since="6.6.0"
+          message="{0} 名称 ''{1}'' 不符合 ''{2}''"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.FormalParameterNamingConventionsRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#formalparameternamingconventions">
+        <description>
+可配置的方法和 Lambda 的正式参数命名约定。此规则报告不符合特定类型（例如 Lambda 参数或最终正式参数）正则表达式的正式参数。每个正则表达式可以通过属性进行配置。
+
+默认情况下，此规则使用标准的 Java 命名约定（驼峰命名法）。
+        </description>
+        <priority>1</priority>
+        <example>
+            <![CDATA[
+            class Foo {
+
+                abstract void bar(int myInt); // This is Camel case, so it's ok
+
+                void bar(int my_i) { // this will be reported
+
+                }
+
+                void lambdas() {
+
+                    // lambdas parameters can be configured separately
+                    Consumer<String> lambda1 = s_str -> { };
+
+                    // lambda parameters with an explicit type can be configured separately
+                    Consumer<String> lambda1 = (String str) -> { };
+
+                }
+
+            }
+            ]]>
+        </example>
+    </rule>
+
+    <rule name="GenericsNaming"
+          language="java"
+          since="4.2.6"
+          message="泛型名称应为一个字母并使用大写字母。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#genericsnaming">
+        <description>
+对泛型值的引用名称应限制为单个大写字母。
+        </description>
+        <priority>4</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//TypeParameter[
+  string-length(@Name) > 1
+  or
+  upper-case(@Name) != @Name
+]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public interface GenericDao<E extends BaseModel, K extends Serializable> extends BaseDao {
+    // This is ok...
+}
+
+public interface GenericDao<E extends BaseModel, K extends Serializable> {
+    // Also this
+}
+
+public interface GenericDao<e extends BaseModel, K extends Serializable> {
+    // 'e' should be an 'E'
+}
+
+public interface GenericDao<EF extends BaseModel, K extends Serializable> {
+   // 'EF' is not ok.
+}
+]]>
+        </example>
+    </rule>
+
+
+    <rule name="IdenticalCatchBranches"
+          language="java"
+          since="6.4.0"
+          minimumLanguageVersion="1.7"
+          message="''catch''分支与''{0}''分支相同"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.IdenticalCatchBranchesRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#identicalcatchbranches">
+        <description>
+相同的catch分支会占用垂直空间，并增加代码的复杂性而不增加功能。更好的做法是将相同的分支合并为一个多重捕获分支。
+        </description>
+        <priority>3</priority>
+        <example>
+            <![CDATA[
+try {
+    // do something
+} catch (IllegalArgumentException e) {
+    throw e;
+} catch (IllegalStateException e) { // Can be collapsed into the previous block
+    throw e;
+}
+
+try {
+    // do something
+} catch (IllegalArgumentException | IllegalStateException e) { // This is better
+    throw e;
+}
+            ]]>
+        </example>
+    </rule>
+
+
+    <rule name="LambdaCanBeMethodReference"
+          language="java"
+          since="7.1.0"
+          message="lambda 表达式可以写成方法引用：`{0}`"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.LambdaCanBeMethodReferenceRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#lambdacanbemethodreference">
+        <description>
+这个规则报告了可以更简洁地写成方法引用的 lambda 表达式。如果 lambda 表达式是一个仅调用一个方法的表达式 lambda，并将整个 lambda 参数列表传递给该方法，则可以改写为方法引用。例如：
+            ```java
+                x -> Foo.call(x) // can be Foo::call
+                x -> call(x)     // can be this::call, if call is an instance method
+                (x, y, z) -> call(x, y, z) // can be this::call
+                () -> foo.get() // can be foo::get
+                x -> x.foo()    // can be XType::foo (where XType is the type of x)
+            ```
+			
+在某些情况下，将 lambda 重写为方法引用可能会改变代码的语义。例如，在 (x) -> someVar.call(x) 中，如果 someVar 为 null，则 lambda 的调用可能会抛出 NullPointerException (NPE)。方法引用 someVar::call 也会在 someVar 为 null 时抛出 NPE，但会在方法引用创建时立即抛出，而 lambda 在创建时不会报错，NPE 仅在 lambda 被调用时抛出（可能永远不会）。代码不应依赖于这种微妙的语义差异，因此这些潜在有问题的 lambda 表达式也会被默认报告。可以通过将属性 ignoreIfMayNPE 设置为 true 来禁用此行为。
+
+属性 ignoreIfMayNPE 默认设置为 true。默认情况下，接收者是方法调用的调用会被忽略，因为它们可能会产生副作用。可以通过将属性 ignoreIfReceiverIsMethod 设置为 false 来更改此行为。
+
+作用范围限制：
+	1.这个规则不会报告形式为 x -> new CtorCall().something(x) 的 lambda，因为方法引用的语义将是创建一个新的对象，而 lambda 每次调用时都会创建一个对象。
+	2.规则不能知道方法调用的限定符是否执行了副作用。这意味着 (x) -> sideEffectingMethod().foo(x) 会被报告。此时请抑制警告。
+        </description>
+        <priority>3</priority>
+        <example>
+            <![CDATA[
+            import java.util.stream.Stream;
+
+            public class LambdaCanBeMethodReference {
+                static {
+                    Stream.of("abc", "d")
+                            .mapToInt(s -> s.length()) // could be String::length
+                            .reduce((x, y) -> Integer.sum(x, y)) // could be Integer::sum
+                            .getAsInt();
+                }
+            }
+            ]]>
+        </example>
+    </rule>
+
+    <rule name="LinguisticNaming"
+          language="java"
+          since="6.7.0"
+          message="语言学反模式 - 方法名称和返回类型在语言上不一致"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.LinguisticNamingRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#linguisticnaming">
+        <description>
+此规则用于发现语言命名反模式。它检查以下情况：
+	1. 变量名看起来应该是布尔类型，但实际类型不同。
+	2. 方法名表明其返回布尔值，但实际返回其他类型。
+	3. Getter 方法应该返回一个值，而 Setter 方法不应返回值。
+	4. 以 "to" 开头的方法，即所谓的转换方法，应该返回一个值，因为根据其名称，它们应该将一个对象转换为另一个对象。
+
+此外，还有一个选项可以检查名称中包含 "To" 的方法，这些方法也被视为转换方法。然而，由于这种检测容易产生误报，这个选项默认是禁用的。
+
+有关更多信息，请参见 [Linguistic Antipatterns - What They Are and How Developers Perceive Them](https://doi.org/10.1007/s10664-014-9350-8)。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class LinguisticNaming {
+    int isValid;    // the field name indicates a boolean, but it is an int.
+    boolean isTrue; // correct type of the field
+
+    void myMethod() {
+        int hasMoneyLocal;      // the local variable name indicates a boolean, but it is an int.
+        boolean hasSalaryLocal; // correct naming and type
+    }
+
+    // the name of the method indicates, it is a boolean, but the method returns an int.
+    int isValid() {
+        return 1;
+    }
+    // correct naming and return type
+    boolean isSmall() {
+        return true;
+    }
+
+    // the name indicates, this is a setter, but it returns something
+    int setName() {
+        return 1;
+    }
+
+    // the name indicates, this is a getter, but it doesn't return anything
+    void getName() {
+        // nothing to return?
+    }
+
+    // the name indicates, it transforms an object and should return the result
+    void toDataType() {
+        // nothing to return?
+    }
+    // the name indicates, it transforms an object and should return the result
+    void grapeToWine() {
+        // nothing to return?
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="LocalHomeNamingConvention"
+          language="java"
+          since="4.0"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          message="会话 EJB 的 Local Home 接口应该以 'LocalHome' 作为后缀。"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#localhomenamingconvention">
+        <description>
+会话 EJB 的 Local Home 接口应该以 'LocalHome' 作为后缀。
+        </description>
+        <priority>4</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ClassDeclaration
+[
+    pmd-java:typeIs('javax.ejb.EJBLocalHome')
+    and not(ends-with(@SimpleName, 'LocalHome'))
+]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public interface MyBeautifulLocalHome extends javax.ejb.EJBLocalHome {} // proper name
+
+public interface MissingProperSuffix extends javax.ejb.EJBLocalHome {}  // non-standard name
+]]>
+        </example>
+    </rule>
+
+    <rule name="LocalInterfaceSessionNamingConvention"
+          language="java"
+          since="4.0"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          message="会话 EJB 的 Local 接口应该以 'Local' 作为后缀。"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#localinterfacesessionnamingconvention">
+        <description>
+会话 EJB 的 Local 接口应该以 'Local' 作为后缀。
+        </description>
+        <priority>4</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ClassDeclaration
+[
+    pmd-java:typeIs('javax.ejb.EJBLocalObject')
+    and not(ends-with(@SimpleName, 'Local'))
+]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public interface MyLocal extends javax.ejb.EJBLocalObject {}                // proper name
+
+public interface MissingProperSuffix extends javax.ejb.EJBLocalObject {}    // non-standard name
+]]>
+        </example>
+    </rule>
+
+    <rule name="LocalVariableCouldBeFinal"
+          language="java"
+          since="2.2"
+          message="局部变量 ''{0}'' 可以声明为 final。"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.LocalVariableCouldBeFinalRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#localvariablecouldbefinal">
+        <description>
+只赋值一次的局部变量可以声明为 `final`。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Bar {
+    public void foo () {
+    String txtA = "a";          // if txtA will not be assigned again it is better to do this:
+    final String txtB = "b";
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="LocalVariableNamingConventions"
+          language="java"
+          since="6.6.0"
+          message="`{0}` 名称 ''{1}'' 与 ''{2}'' 不匹配"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.LocalVariableNamingConventionsRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#localvariablenamingconventions">
+        <description>
+可配置本地变量声明和其他局部作用域变量的命名约定。此规则报告不符合其特定类型所适用的正则表达式的变量声明（例如 final 变量或捕获块参数）。每个正则表达式可以通过属性进行配置。
+
+默认情况下，此规则使用标准的 Java 命名约定（驼峰命名法）。
+        </description>
+        <priority>1</priority>
+        <example>
+            <![CDATA[
+            class Foo {
+                void bar() {
+                    int localVariable = 1; // This is in camel case, so it's ok
+                    int local_variable = 1; // This will be reported unless you change the regex
+
+                    final int i_var = 1; // final local variables can be configured separately
+
+                    try {
+                        foo();
+                    } catch (IllegalArgumentException e_illegal) {
+                        // exception block parameters can be configured separately
+                    }
+
+                }
+            }
+            ]]>
+        </example>
+    </rule>
+
+    <rule name="LongVariable"
+          language="java"
+          since="0.3"
+          message="避免使用过长的变量名，如 {0}。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#longvariable">
+        <description>
+字段、形式参数或局部变量名称过长会使代码难以理解。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="minimum" type="Integer" description="The variable length reporting threshold" min="1" max="100" value="17"/>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//VariableId[string-length(@Name) > $minimum]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Something {
+    int reallyLongIntName = -3;             // VIOLATION - Field
+    public static void main( String argumentsList[] ) { // VIOLATION - Formal
+        int otherReallyLongName = -5;       // VIOLATION - Local
+        for (int interestingIntIndex = 0;   // VIOLATION - For
+             interestingIntIndex < 10;
+             interestingIntIndex ++ ) {
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="MDBAndSessionBeanNamingConvention"
+          language="java"
+          since="4.0"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          message="SessionBean 或 MessageBean 应以 Bean 作为后缀。"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#mdbandsessionbeannamingconvention">
+        <description>
+EJB 规范指出，任何 MessageDrivenBean 或 SessionBean 应以 'Bean' 作为后缀。
+        </description>
+        <priority>4</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ClassDeclaration
+[
+    (pmd-java:typeIs('javax.ejb.SessionBean')
+     or pmd-java:typeIs('javax.ejb.MessageDrivenBean'))
+    and not(ends-with(@SimpleName, 'Bean'))
+]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class SomeBean implements SessionBean{}                  // proper name
+
+public class MissingTheProperSuffix implements SessionBean {}   // non-standard name
+]]>
+        </example>
+    </rule>
+
+    <rule name="MethodArgumentCouldBeFinal"
+          language="java"
+          since="2.2"
+          message="参数 ''{0}'' 没有被赋值，可以声明为 final。"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.MethodArgumentCouldBeFinalRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#methodargumentcouldbefinal">
+        <description>
+报告那些可以声明为 `final` 的方法和构造函数参数，因为它们在方法体内从未被重新赋值。
+
+此规则忽略未使用的参数，以避免与规则 `{% rule java/bestpractices/UnusedFormalParameter %}` 重叠。它还会忽略抽象方法的参数。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+class Foo {
+    // reported, parameter can be declared final
+    public String foo1(String param) {
+        return param;
+    }
+    // not reported, parameter is declared final
+    public String foo2(final String param) {
+        return param.trim();
+    }
+    // not reported because param is unused
+    public String unusedParam(String param) {
+        return "abc";
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="MethodNamingConventions"
+          language="java"
+          since="1.2"
+          message="{0} 名称 ''{1}'' 不符合 ''{2}''"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.MethodNamingConventionsRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#methodnamingconventions">
+        <description>
+可配置的方法声明命名约定。此规则报告不符合其特定类型（例如 JUnit 测试或本地方法）正则表达式的方法声明。每个正则表达式可以通过属性进行配置。
+
+默认情况下，此规则使用标准 Java 命名约定（驼峰命名法）。
+        </description>
+        <priority>1</priority>
+        <example>
+<![CDATA[
+public class Foo {
+    public void fooStuff() {
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="NoPackage"
+          language="java"
+          since="3.3"
+          message="所有类、接口、枚举和注解必须属于一个命名的包。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#nopackage">
+        <description>
+检测类、接口、枚举或注解是否没有包定义。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>/CompilationUnit[not(PackageDeclaration)]/*[pmd-java:nodeIs("TypeDeclaration")][1]</value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+// no package declaration
+public class ClassInDefaultPackage {
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UseUnderscoresInNumericLiterals"
+          language="java"
+          since="6.10.0"
+          minimumLanguageVersion="1.7"
+          message="数字 {0} 应该每隔三位数字用下划线分隔。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#useunderscoresinnumericliterals">
+        <description>
+自 Java 1.7 起，数字文字可以使用下划线来分隔数字。这个规则强制要求超过一定长度的数字文字使用这些下划线，以提高可读性。
+
+该规则目前仅支持十进制（基数 10）文字。可配置的属性定义了不需要下划线的可接受长度。即使在该长度下，不合适的下划线（没有形成 3 位数字的组）也会被报告。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="acceptableDecimalLength" type="Integer" value="4" min="3" max="1000"
+                      description="Length under which literals in base 10 are not required to have underscores"/>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+//NumericLiteral
+ (: Filter out literals in base other than 10 :)
+ [@Base = 10]
+ (: Filter out ignored field name :)
+ [not(ancestor::VariableDeclarator[1][@Name = 'serialVersionUID'])]
+ [
+   some $num in tokenize(@Image, "[dDfFlLeE+\-]")
+   satisfies not(
+                  ( contains($num, ".")
+                    and string-length(substring-before($num, ".")) <= $acceptableDecimalLength
+                    and string-length(substring-after($num, ".")) <= $acceptableDecimalLength
+                    or string-length($num) <= $acceptableDecimalLength
+                  )
+                  and not(contains($num,"_"))
+                  or matches($num, "^[0-9]{1,3}(_[0-9]{3})*(\.([0-9]{3}_)*[0-9]{1,3})?$")
+                )
+ ]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+public class Foo {
+    private int num = 1000000; // should be 1_000_000
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="OnlyOneReturn"
+          language="java"
+          since="1.0"
+          message="一个方法应仅有一个退出点，并且该退出点应该是方法中的最后一条语句。"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.OnlyOneReturnRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#onlyonereturn">
+        <description>
+一个方法应仅有一个退出点，并且该退出点应该是方法中的最后一条语句。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class OneReturnOnly1 {
+  public String foo(int x) {
+    if (x > 0) {
+      return "hey";   // first exit
+    }
+    return "hi";    // second exit
+  }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="PackageCase"
+          language="java"
+          since="3.3"
+          message="包名包含大写字符。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#packagecase">
+        <description>
+检测包定义中是否包含大写字符。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>//PackageDeclaration[lower-case(@Name) != @Name]</value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+package com.MyCompany;  // should be lowercase name
+
+public class SomeClass {
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="PrematureDeclaration"
+          language="java"
+          since="5.0"
+          message="''{0}'' 的声明可以移动到其使用位置更近的地方"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.PrematureDeclarationRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#prematuredeclaration">
+        <description>
+检查变量是否在可能使用之前就被声明。声明被认为是过早的，如果在变量声明和首次读取之间有一些可能会返回或抛出异常的语句。
+
+一些变量无法在首次使用位置附近声明，因为在首次使用之前可能会发生副作用。我们试图通过将大多数方法和构造函数调用视为不纯来避免报告这些情况。参见第二个示例。
+
+请注意，这条规则旨在提高代码的可读性，而不是进行优化。智能JIT编译器不会在乎变量是否被过早声明，因为它可以重新排序代码。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public int getLength(String[] strings) {
+
+    int length = 0; // could be moved closer to the loop
+
+    if (strings == null || strings.length == 0) return 0;
+
+    for (String str : strings) {
+        length += str.length();
+    }
+
+    return length;
+}
+]]>
+        </example>
+        <example>
+<![CDATA[
+public int getLength(String[] strings) {
+
+    int startTime = System.nanoTime(); // cannot be moved because initializer is impure
+
+    if (strings == null || strings.length == 0) {
+        // some error logic
+        throw new SomeException(...);
+    }
+
+    for (String str : strings) {
+        length += str.length();
+    }
+
+    return System.nanoTime() - startTime;
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="RemoteInterfaceNamingConvention"
+          language="java"
+          since="4.0"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          message="会话EJB的远程接口不应以“Remote”作为后缀。"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#remoteinterfacenamingconvention">
+        <description>
+会话EJB的远程接口不应以“Remote”作为后缀。
+        </description>
+        <priority>4</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ClassDeclaration
+[
+    pmd-java:typeIs('javax.ejb.EJBObject')
+    and matches(@SimpleName, '.*(Session|EJB|Bean)$')
+]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+/* Poor Session suffix */
+public interface BadSuffixSession extends javax.ejb.EJBObject {}
+
+/* Poor EJB suffix */
+public interface BadSuffixEJB extends javax.ejb.EJBObject {}
+
+/* Poor Bean suffix */
+public interface BadSuffixBean extends javax.ejb.EJBObject {}
+]]>
+        </example>
+    </rule>
+
+    <rule name="RemoteSessionInterfaceNamingConvention"
+          language="java"
+          since="4.0"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          message="会话EJB的远程Home接口应以“Home”作为后缀。"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#remotesessioninterfacenamingconvention">
+        <description>
+会话EJB的远程Home接口应以“Home”作为后缀。
+        </description>
+        <priority>4</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ClassDeclaration
+[
+    pmd-java:typeIs('javax.ejb.EJBHome')
+    and not(ends-with(@SimpleName, 'Home'))
+]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public interface MyBeautifulHome extends javax.ejb.EJBHome {}       // proper name
+
+public interface MissingProperSuffix extends javax.ejb.EJBHome {}   // non-standard name
+]]>
+        </example>
+    </rule>
+
+    <rule name="ShortClassName"
+          language="java"
+          since="5.0"
+          message="避免使用如{0}这样的短类名。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#shortclassname">
+        <description>
+短类名（例如少于五个字符）是不推荐的。
+        </description>
+        <priority>4</priority>
+        <properties>
+            <property name="minimum" type="Integer" value="5" min="1" max="100" description="Number of characters that are required as a minimum for a class name."/>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ClassDeclaration[string-length(@SimpleName) < $minimum]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ShortMethodName"
+          language="java"
+          since="0.3"
+          message="避免使用短方法名"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#shortmethodname">
+        <description>
+方法名过短对读者不够友好。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="minimum" type="Integer" value="3" min="1" max="100" description="Number of characters that are required as a minimum for a method name."/>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodDeclaration[string-length(@Name) < $minimum]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class ShortMethod {
+    public void a( int i ) { // Violation
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ShortVariable"
+          language="java"
+          since="0.3"
+          message="避免使用短变量名，例如 ''{0}''。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#shortvariable">
+        <description>
+字段、局部变量、枚举常量名称或参数名称过短对读者不友好。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="minimum" type="Integer" value="3" min="1" max="100" description="Number of characters that are required as a minimum for a variable name."/>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//VariableId[string-length(@Name) < $minimum]
+ (: ForStatement :)
+ [not(../../parent::ForInit)]
+ (: Foreach statement :)
+ [not(../../parent::ForeachStatement)]
+ (: Catch statement parameter :)
+ [not(parent::CatchParameter)]
+ (: Lambda expression parameter :)
+ [not(parent::LambdaParameter)]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Something {
+    private int q = 15;                         // field - too short
+    public static void main( String as[] ) {    // formal arg - too short
+        int r = 20 + q;                         // local var - too short
+        for (int i = 0; i < 10; i++) {          // not a violation (inside 'for' loop)
+            r += q;
+        }
+        for (Integer i : numbers) {             // not a violation (inside 'for-each' loop)
+            r += q;
+        }
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="TooManyStaticImports"
+          language="java"
+          since="4.1"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          message="过多的静态导入可能会导致代码混乱。"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#toomanystaticimports">
+        <description>
+如果过度使用静态导入功能，可能会导致程序变得难以阅读和维护，污染命名空间，混入所有导入的静态成员。阅读代码的人（包括几个月后重新查看的你自己）将不知道某个静态成员来自哪个类（Sun 1.5 语言指南）。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="maximumStaticImports" type="Integer"
+                      description="All static imports can be disallowed by setting this to 0" min="0" max="100" value="4"/>
+            <property name="xpath">
+                <value>
+<![CDATA[
+.[count(ImportDeclaration[@Static = true()]) > $maximumStaticImports]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+import static Lennon;
+import static Ringo;
+import static George;
+import static Paul;
+import static Yoko; // Too much !
+]]>
+        </example>
+    </rule>
+
+
+    <rule name="UnnecessaryAnnotationValueElement"
+          language="java"
+          since="6.2.0"
+          message="避免在注解中使用`value`，当它是唯一的元素时。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#unnecessaryannotationvalueelement">
+        <description>
+            避免在注解中使用`value`，当它是唯一的元素时。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+//Annotation/AnnotationMemberList[count(*) = 1 and MemberValuePair[@Shorthand = false() and @Name = 'value']]
+]]>
+                </value>
+            </property>
+            <property name="java7Compatibility" type="Boolean" description="If disabled, the rule shows also violations that are applicable for java8+" value="false" />
+        </properties>
+        <example>
+            <![CDATA[
+@TestClassAnnotation(value = "TEST")
+public class Foo {
+
+    @TestMemberAnnotation(value = "TEST")
+    private String y;
+
+    @TestMethodAnnotation(value = "TEST")
+    public void bar() {
+        int x = 42;
+        return;
+    }
+}
+
+// should be
+
+@TestClassAnnotation("TEST")
+public class Foo {
+
+    @TestMemberAnnotation("TEST")
+    private String y;
+
+    @TestMethodAnnotation("TEST")
+    public void bar() {
+        int x = 42;
+        return;
+    }
+}
+
+]]>
+        </example>
+    </rule>
+
+    <rule name="UnnecessaryBoxing"
+          language="java"
+          since="7.0.0"
+          minimumLanguageVersion="1.5"
+          message="不必要的{0}"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.UnnecessaryBoxingRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#unnecessaryboxing">
+        <description>
+报告那些可以安全移除的显式装箱和拆箱转换，因为这些转换可以由编译器自动插入，或者因为它们在语义上是无操作的（例如，拆箱一个值然后立即重新装箱）。
+
+注意，这只处理通过调用 `valueOf` 或 `intValue`、`byteValue` 等方法发生的装箱和拆箱转换。要求进行转换的强制类型转换由{% rule UnnecessaryCast %}报告。
+        </description>
+        <priority>3</priority>
+        <example><![CDATA[
+{
+        // Instead of
+        Integer integer = Integer.valueOf(2);
+        // you may just write
+        Integer integer = 2;
+
+        int i = integer.intValue(); // similarly for unboxing
+
+        // Instead of
+        int x = Integer.valueOf("42");
+        // you may just write
+        int x = Integer.parseInt("42");
+}
+            ]]>
+        </example>
+    </rule>
+
+    <!-- This is only restricted to java 5+ because the rule doesn't support
+         the type system pre-java5, where there were no autoboxing conversions. -->
+    <rule name="UnnecessaryCast"
+          language="java"
+          minimumLanguageVersion="1.5"
+          since="6.24.0"
+          message="不必要的转换 ({0})"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.UnnecessaryCastRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#unnecessarycast">
+        <description><![CDATA[
+检测那些可以移除的强制类型转换，因为被转换的操作数已经适合目标类型。例如，在以下代码中：
+```java
+Object context = (Comparable) "o";
+```
+这里的强制转换是不必要的，因为 `String` 已经是 `Comparable` 和 `Object` 的子类型。
+
+这也会标记由于 Java 5 的自动装箱特性而可以避免的强制转换：
+```java
+Integer integer = (Integer) 1;
+```
+字面量 `1` 会自动装箱为 `Integer`。
+            ]]></description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+import java.util.function.Function;
+class SomeClass {
+   static {
+      Object o; long l; int i; Integer boxedInt;
+
+      // reference conversions
+
+      o = (Object) new SomeClass();      // unnecessary
+      o = (SomeClass) o;                 // necessary (narrowing cast)
+      o = (Comparable<String>) "string"; // unnecessary
+
+      // primitive conversions
+
+      l = (long) 2;   // unnecessary
+      l = (long) 2.0; // necessary (narrowing cast)
+      l = (byte) i;   // necessary (narrowing cast)
+
+      // boxing/unboxing casts (since java 5)
+
+      o = (Integer) 3;    // unnecessary (autoboxing would apply)
+      o = (long) 3;       // necessary (would be boxed to Long)
+      l = (int) boxedInt; // necessary (cannot cast Integer to long)
+
+      // casts that give a target type to a lambda/ method ref are necessary
+
+      o = (Function<Integer, String>) Integer::toString; // necessary (no target type)
+   }
+}
+]]>
+        </example>
+        <example>
+<![CDATA[
+import java.util.*;
+class SomeClass {
+   static {
+       /* Casts involving access to collections were common before Java 5, because collections
+        * were not generic. This rule may hence be useful when converting from using a raw
+        * type like `List` to a parameterized type like `List<String>`.
+        */
+       List<String> stringList = Arrays.asList("a", "b");
+       String element = (String) stringList.get(0); // this cast is unnecessary
+   }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UnnecessaryConstructor"
+          language="java"
+          since="1.0"
+          message="避免不必要的构造函数——编译器会为你自动生成这些构造函数。"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.UnnecessaryConstructorRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#unnecessaryconstructor">
+        <description>
+此规则检测构造函数是否不必要；即，当只有一个构造函数且该构造函数与默认构造函数相同的时候。默认构造函数应具有与声明类相同的访问修饰符。在枚举类型中，默认构造函数隐式为 `private`。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Foo {
+  public Foo() {}
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UnnecessaryFullyQualifiedName"
+          language="java"
+          since="5.0"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.UnnecessaryFullyQualifiedNameRule"
+          message="不必要的限定符 ''{0}''：''{1}'' 已经在作用域中{2}"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#unnecessaryfullyqualifiedname">
+        <description>
+导入语句允许使用非完全限定名。使用已被导入语句涵盖的完全限定名是多余的。考虑使用非完全限定名。
+        </description>
+        <priority>4</priority>
+        <example>
+<![CDATA[
+import java.util.List;
+
+public class Foo {
+    private java.util.List list1;   // Unnecessary FQN
+    private List list2;             // More appropriate given import of 'java.util.List'
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UnnecessaryImport"
+          language="java"
+          since="6.34.0"
+          message="不必要的引入 ''{0}''"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.UnnecessaryImportRule"
+          typeResolution="true"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#unnecessaryimport">
+        <description>
+报告可以移除的导入语句。这些导入语句可能是未使用的、重复的，或者它们导入的成员已经隐式在作用域中，因为它们在 `java.lang` 或当前包中。
+
+如果某些导入无法解析，例如因为你在不完整的辅助类路径下运行 PMD，某些导入可能被保守地标记为已使用，以避免误报。
+        </description>
+        <priority>4</priority>
+        <example>
+<![CDATA[
+            import java.io.File;            // not used, can be removed
+            import java.util.Collections;   // used below
+            import java.util.*;             // so this one is not used
+
+            import java.lang.Object;        // imports from java.lang, unnecessary
+            import java.lang.Object;        // duplicate, unnecessary
+
+            public class Foo {
+                static Object emptyList() {
+                    return Collections.emptyList();
+                }
+            }
+            ]]>
+        </example>
+    </rule>
+
+    <rule name="UnnecessaryLocalBeforeReturn"
+          language="java"
+          since="3.3"
+          message="考虑直接返回值，而不是将其存储在局部变量''{0}''中"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.UnnecessaryLocalBeforeReturnRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#unnecessarylocalbeforereturn">
+        <description>
+避免创建不必要的局部变量
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Foo {
+   public int foo() {
+     int x = doSomething();
+     return x;  // instead, just 'return doSomething();'
+   }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UnnecessaryModifier"
+          language="java"
+          since="1.02"
+          message="不必要的修饰符{0}在{1}''{2}''{3}上"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.UnnecessaryModifierRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#unnecessarymodifier">
+        <description>
+接口和注解中的字段默认是 `public static final`，方法默认是 `public abstract`。
+在接口或注解中的嵌套类、接口或注解默认是 `public static`（所有嵌套接口和注解默认是静态的）。
+嵌套枚举默认是 `static`。
+出于历史原因，编译器接受上下文隐含的修饰符，但这些修饰符是多余的。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public @interface Annotation {
+    public abstract void bar();     // both abstract and public are ignored by the compiler
+    public static final int X = 0;  // public, static, and final all ignored
+    public static class Bar {}      // public, static ignored
+    public static interface Baz {}  // ditto
+}
+public interface Foo {
+    public abstract void bar();     // both abstract and public are ignored by the compiler
+    public static final int X = 0;  // public, static, and final all ignored
+    public static class Bar {}      // public, static ignored
+    public static interface Baz {}  // ditto
+}
+public class Bar {
+    public static interface Baz {}  // static ignored
+    public static enum FoorBar {    // static ignored
+        FOO;
+    }
+}
+public class FooClass {
+    static record BarRecord() {}     // static ignored
+}
+public interface FooInterface {
+    static record BarRecord() {}     // static ignored
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UnnecessaryReturn"
+          language="java"
+          since="1.3"
+          message="多余的return语句"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.UnnecessaryReturnRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#unnecessaryreturn">
+        <description>
+避免使用不必要的返回语句。当没有任何指令跟随时，返回语句是不必要的。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Foo {
+    public void bar() {
+        int x = 42;
+        return;
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UnnecessarySemicolon"
+          language="java"
+          since="6.46.0"
+          message="不必要的分号。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#unnecessarysemicolon">
+        <description>
+报告不必要的分号（即所谓的“空语句”和“空声明”）。这些可以在不改变程序的情况下移除。Java 语法允许它们存在，主要是出于历史原因，但应尽量避免使用。
+
+此规则不会报告那些语法上必需的空语句，例如，它们作为控制语句的主体存在。
+
+此规则取代了 EmptyStatementNotInLoop。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+      (: empty declarations :)
+      //EmptyDeclaration
+      (: empty statements :)
+    | //Block/EmptyStatement
+
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+class Foo {
+    {
+        toString();; // one of these semicolons is unnecessary
+        if (true); // this semicolon is not unnecessary, but it could be an empty block instead (not reported)
+    }
+}; // this semicolon is unnecessary
+
+]]>
+        </example>
+    </rule>
+
+
+    <rule name="UseDiamondOperator"
+          language="java"
+          since="6.11.0"
+          message="显式的类型参数可以被替代：{0}"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.UseDiamondOperatorRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#usediamondoperator"
+          minimumLanguageVersion="1.7">
+        <description><![CDATA[
+在某些情况下，构造函数调用中的显式类型参数可以被钻石类型参数（`<>`）替代，由编译器推断出。这条规则建议你尽可能使用钻石类型参数，因为它避免了类型参数的重复，并使代码更简洁易读。
+
+这个规则在将代码库升级到 Java 1.7、Java 1.8 或 Java 9 时特别有用。钻石语法首次在 Java 1.7 中引入。在 Java 8 中，Java 的类型推断改进使得更多的类型参数变得多余。在 Java 9 中，匿名类构造函数的类型参数推断成为可能。
+            ]]></description>
+        <priority>3</priority>
+        <example>
+            <![CDATA[
+            import java.util.*;
+            class Foo {
+                static {
+                    List<String> strings;
+                    strings = new ArrayList<String>(); // unnecessary duplication of type parameters
+                    strings = new ArrayList<>();       // using diamond type arguments is more concise
+
+                    strings = new ArrayList(); // accidental use of a raw type, you can use ArrayList<> instead
+
+                    strings = new ArrayList<>() {
+                        // for anonymous classes, this is possible since Java 9 only
+                    };
+                }
+            }
+            ]]>
+        </example>
+    </rule>
+
+    <rule name="UseExplicitTypes"
+          language="java"
+          minimumLanguageVersion="10"
+          since="7.0.0"
+          message="使用显式类型。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#useexplicittypes">
+        <description>
+Java 10 引入了 var 关键字。这减少了书写的代码量，因为 Java 可以从变量声明的初始化器中推断出类型。
+
+这实际上是一种权衡：一方面，它可以通过消除冗余的信息来使代码更具可读性。另一方面，它也可能使代码的可读性下降，因为省略了有用的信息。对于何时使用或不使用 var 并没有一个通用的规则。
+
+当类型在阅读语句时本身就很明确（例如：赋值给字面值或构造函数调用）时，使用 var 可能是合理的。这些用例可以通过属性进行启用。
+
+请注意，lambda 参数是允许的，因为它们默认已经被推断（var 关键字是完全可选的）。
+
+另见 局部变量类型推断样式指南(https://openjdk.org/projects/amber/guides/lvti-style-guide)。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="allowLiterals" type="Boolean" value="false" description="Allow when variables are directly initialized with literals"/>
+            <property name="allowCtors" type="Boolean" value="false" description="Allow when variables are directly initialized with a constructor call"/>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+//LocalVariableDeclaration[@TypeInferred = true()]
+    [not(VariableDeclarator[*[pmd-java:nodeIs("Literal")]]) or $allowLiterals = false()]
+    [not(VariableDeclarator[ConstructorCall]) or $allowCtors = false()]
+]]>
+                </value>
+            </property>
+        </properties>
+    </rule>
+
+    <rule name="UselessParentheses"
+          language="java"
+          since="5.0"
+          message="无用的括号。"
+          class="net.sourceforge.pmd.lang.java.rule.codestyle.UselessParenthesesRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#uselessparentheses">
+        <description>
+括号用于覆盖默认的运算符优先级规则。移除那些不会改变运算符相对嵌套层级的括号是多余的，因为它们不会改变封闭表达式的语义。
+
+一些严格来说是多余的括号，仍然可以被认为是有用的，因为它们提高了可读性。此规则允许忽略两种类型的多余括号：
+
+1.“澄清性”括号，用于分隔具有不同优先级的运算符。虽然这些括号是不必要的，但它们使优先级规则变得显式，这对不常用的运算符可能很有用。例如：
+    ```java
+    (a + b) &amp; c // 等同于 `a + b &amp; c`，但可能更清晰
+    ```
+    取消设置属性 `ignoreClarifying` 以报告这些括号。
+
+2.“平衡”括号，这些括号是不必要的，但视觉上平衡了另一对括号围绕一个等于运算符。例如，这两个表达式是等效的：
+    ```java
+    (a == null) != (b == null)
+    a == null != (b == null)
+    ```
+    右边的括号是必需的，而左边的括号只是视觉上的平衡。取消设置属性 `ignoreBalancing` 以报告这些括号。
+        </description>
+        <priority>4</priority>
+        <example>
+<![CDATA[
+public class Foo {
+    {
+        int n = 0;
+        n = (n);         // here
+        n = (n * 2) * 3; // and here
+        n = n * (2 * 3); // and here
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UselessQualifiedThis"
+          language="java"
+          since="5.4.0"
+          message="在同一个类中使用了无用的限定符。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#uselessqualifiedthis">
+        <description>
+            在同一个类中使用的限定符。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ThisExpression/ClassType
+[ ancestor::*[pmd-java:nodeIs('TypeDeclaration')][1]/@SimpleName = ./@SimpleName ]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+    final Foo otherFoo = Foo.this;  // use "this" directly
+
+    public void doSomething() {
+         final Foo anotherFoo = Foo.this;  // use "this" directly
+    }
+
+    private ActionListener returnListener() {
+        return new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                doSomethingWithQualifiedThis(Foo.this);  // This is fine
+            }
+        };
+    }
+
+    private class Foo3 {
+        final Foo myFoo = Foo.this;  // This is fine
+    }
+
+    private class Foo2 {
+        final Foo2 myFoo2 = Foo2.this;  // Use "this" direclty
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UseShortArrayInitializer"
+        language="java"
+        since="6.15.0"
+        message="数组初始化可以更简洁地书写。"
+        class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+        externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_codestyle.html#useshortarrayinitializer">
+        <description>
+<![CDATA[
+在声明和初始化数组字段或变量时，通常不需要显式地使用`new`关键字来创建数组。可以直接在花括号中定义数组的初始内容。
+
+例如，`int[] x = new int[] { 1, 2, 3 };` 可以简写为 `int[] x = { 1, 2, 3 };`。
+]]>
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+//VariableDeclarator
+    [VariableId[@TypeInferred = false() and @ArrayType = true()]]
+    [ArrayAllocation/ArrayInitializer]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+Foo[] x = new Foo[] { ... }; // Overly verbose
+Foo[] x = { ... }; //Equivalent to above line
+]]>
+        </example>
+    </rule>
+</ruleset>

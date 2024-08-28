@@ -1,0 +1,3088 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<ruleset name="Error Prone"
+    xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+用于检测可能存在问题、极为混乱或容易导致运行时错误的结构的规则。
+    </description>
+
+    <rule name="AssignmentInOperand"
+          language="java"
+          since="1.03"
+          message="避免在操作数中进行赋值。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.AssignmentInOperandRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#assignmentinoperand">
+        <description>
+避免在操作数中进行赋值，因为这会使代码变得更加复杂和难以阅读。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public void bar() {
+    int x = 2;
+    if ((x = getX()) == 3) {
+      System.out.println("3!");
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AssignmentToNonFinalStatic"
+          language="java"
+          since="2.2"
+          message="可能在构造函数中对非 final 静态字段 ''{0}'' 进行不安全的赋值。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.AssignmentToNonFinalStaticRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#assignmenttononfinalstatic">
+        <description>
+识别可能不安全的静态字段使用。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class StaticField {
+   static int x;
+   public FinalFields(int y) {
+    x = y; // unsafe
+   }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidAccessibilityAlteration"
+          language="java"
+          since="4.1"
+          message="不应使用 setAccessible() 修改构造函数、方法或字段的可见性。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#avoidaccessibilityalteration">
+        <description>
+方法如 `getDeclaredConstructors()`、`getDeclaredMethods()` 和 `getDeclaredFields()` 也返回私有的构造函数、方法和字段。这些可以通过调用 `setAccessible(true)` 使其可访问。这会访问通常受保护的数据，从而违反封装原则。
+
+此规则检测对 `setAccessible` 的调用，并查找可能的可访问性更改。如果 `setAccessible` 的调用被包装在 `PrivilegedAction` 中，则假定访问更改是故意的，不会被报告。
+
+请注意，从 Java 17 开始，用于 `PrivilegedAction` 执行的安全管理器已被弃用：[JEP 411: Deprecate the Security Manager for Removal](https://openjdk.org/jeps/411)。为了确保代码的未来兼容性，应使用常规的抑制方法（例如使用 `@SuppressWarnings` 注解）来处理故意的访问更改。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodCall[
+          pmd-java:matchesSig("java.lang.reflect.AccessibleObject#setAccessible(boolean)")
+       or pmd-java:matchesSig("_#setAccessible(java.lang.reflect.AccessibleObject[],boolean)")
+    ]
+    [not(ArgumentList/BooleanLiteral[@True = false()])]
+    (: exclude anonymous privileged action classes :)
+    [not(ancestor::ConstructorCall[1][pmd-java:typeIs('java.security.PrivilegedAction')]/AnonymousClassDeclaration)]
+    (: exclude inner privileged action classes :)
+    [not(ancestor::ClassDeclaration[1][pmd-java:typeIs('java.security.PrivilegedAction')])]
+    (: exclude privileged action lambdas :)
+    [not(ancestor::LambdaExpression[pmd-java:typeIs('java.security.PrivilegedAction')])]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+
+public class Violation {
+    private void invalidSetAccessCalls() throws NoSuchMethodException, SecurityException {
+        Constructor<?> constructor = this.getClass().getDeclaredConstructor(String.class);
+        // call to forbidden setAccessible
+        constructor.setAccessible(true);
+
+        Method privateMethod = this.getClass().getDeclaredMethod("aPrivateMethod");
+        // call to forbidden setAccessible
+        privateMethod.setAccessible(true);
+
+        // deliberate accessibility alteration
+        String privateField = AccessController.doPrivileged(new PrivilegedAction<String>() {
+            @Override
+            public String run() {
+                try {
+                    Field field = Violation.class.getDeclaredField("aPrivateField");
+                    field.setAccessible(true);
+                    return (String) field.get(null);
+                } catch (ReflectiveOperationException | SecurityException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        });
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidAssertAsIdentifier"
+          language="java"
+          maximumLanguageVersion="1.3"
+          since="3.4"
+          message="避免将 assert 用作标识符；它在 JDK 1.4 中成为了保留字。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#avoidassertasidentifier">
+        <description>
+使用 `assert` 这个术语会与较新版本的 Java 冲突，因为它是一个保留字。
+
+自 Java 1.4 起，`assert` 关键字成为了保留字，将其用作标识符会导致 Java 1.4 及更高版本的编译失败。因此，此规则仅对 Java 1.4 之前的旧代码有用。它可以用来识别在 Java 更新之前的有问题的代码。
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath">
+                <value>//VariableId[@Name='assert']</value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class A {
+    public class Foo {
+        String assert = "foo";
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidBranchingStatementAsLastInLoop"
+          language="java"
+          since="5.0"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.AvoidBranchingStatementAsLastInLoopRule"
+          message="避免在循环的最后使用分支语句。"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#avoidbranchingstatementaslastinloop">
+        <description>
+在循环的最后使用分支语句可能是一个错误，或者会引起混淆。确保这种用法不是一个错误，或者考虑使用其他方法。
+        </description>
+        <priority>2</priority>
+        <example>
+<![CDATA[
+// unusual use of branching statement in a loop
+for (int i = 0; i < 10; i++) {
+    if (i*i <= 25) {
+        continue;
+    }
+    break;
+}
+
+// this makes more sense...
+for (int i = 0; i < 10; i++) {
+    if (i*i > 25) {
+        break;
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidCallingFinalize"
+          language="java"
+          since="3.0"
+          message="避免显式调用 finalize()。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#avoidcallingfinalize">
+        <description>
+方法 Object.finalize() 会在垃圾回收器确定没有更多对对象的引用时被调用。应用程序逻辑不应调用此方法。
+
+请注意，自 JDK 9 起，Oracle 已将 Object.finalize() 声明为已弃用。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodCall[pmd-java:matchesSig("java.lang.Object#finalize()")]
+    (: it's ok inside finalize :)
+    [not(SuperExpression and ancestor::*[self::MethodDeclaration or self::Initializer][1][@Name = 'finalize'][@Arity = 0][VoidType])]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+void foo() {
+    Bar b = new Bar();
+    b.finalize();
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidCatchingNPE"
+          language="java"
+          since="1.8"
+          message="避免捕获 NullPointerException；考虑消除导致 NPE 的根本原因。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#avoidcatchingnpe">
+        <description>
+代码在正常情况下不应抛出 NullPointerExceptions。捕获块可能会掩盖原始错误，从而导致后续出现其他更微妙的问题。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//CatchClause/CatchParameter/ClassType[pmd-java:typeIsExactly('java.lang.NullPointerException')]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+    void bar() {
+        try {
+            // do something
+        } catch (NullPointerException npe) {
+        }
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidCatchingThrowable"
+          language="java"
+          since="1.2"
+          message="捕获语句不应捕获 Throwable，因为它包含错误。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#avoidcatchingthrowable">
+        <description>
+捕获 Throwable 错误是不推荐的，因为其范围非常广泛。它包括如 OutOfMemoryError 这样的运行时问题，这些问题应单独暴露和管理。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+                //CatchParameter[ClassType[pmd-java:typeIsExactly('java.lang.Throwable')]]/VariableId
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public void bar() {
+    try {
+        // do something
+    } catch (Throwable th) {  // should not catch Throwable
+        th.printStackTrace();
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidDecimalLiteralsInBigDecimalConstructor"
+          language="java"
+          since="3.4"
+          message="避免使用十进制（float/double）字面量创建 BigDecimal。应使用字符串字面量。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#avoiddecimalliteralsinbigdecimalconstructor">
+        <description>
+有人可能会认为 "new BigDecimal(0.1)" 的结果与 0.1 完全相等，但实际上它等于 .1000000000000000055511151231257827021181583404541015625。这是因为 0.1 不能被准确表示为 double（或任何有限长度的二进制分数）。因此，传递给构造函数的长整型值实际上并不完全等于 0.1，尽管看起来是这样。
+
+另一方面，使用 (String) 构造函数则是完全可预测的：'new BigDecimal("0.1")' 与 0.1 完全相等，正如预期的那样。因此，通常推荐使用 (String) 构造函数来代替此构造函数。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ConstructorCall[pmd-java:matchesSig('java.math.BigDecimal#new(double)')]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+BigDecimal bd = new BigDecimal(1.123);       // loss of precision, this would trigger the rule
+
+BigDecimal bd = new BigDecimal("1.123");     // preferred approach
+
+BigDecimal bd = new BigDecimal(12);          // preferred approach, ok for integer values
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidDuplicateLiterals"
+          language="java"
+          since="1.0"
+          message="字符串字面量 {0} 在此文件中出现了 {1} 次；第一次出现是在第 {2} 行。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.AvoidDuplicateLiteralsRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#avoidduplicateliterals">
+        <description>
+包含重复字符串字面量的代码通常可以通过将字符串声明为常量字段来改进。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+private void bar() {
+     buz("Howdy");
+     buz("Howdy");
+     buz("Howdy");
+     buz("Howdy");
+}
+private void buz(String x) {}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidEnumAsIdentifier"
+          language="java"
+          maximumLanguageVersion="1.4"
+          since="3.4"
+          message="避免使用 enum 作为标识符；它在 JDK 1.5 中是一个保留字。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#avoidenumasidentifier">
+        <description>
+使用 `enum` 这个术语会与较新版本的 Java 冲突，因为它是一个保留字。
+
+自 Java 1.5 起，`enum` 关键字成为了保留字，将其用作标识符会导致 Java 1.5 及更高版本的编译失败。因此，此规则仅对 Java 1.5 之前的旧代码有用。它可以用来识别在 Java 更新之前的有问题的代码。
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath">
+                <value>//VariableId[@Name='enum']</value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class A {
+    public class Foo {
+        String enum = "foo";
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidFieldNameMatchingMethodName"
+          language="java"
+          since="3.0"
+          message="字段 {0} 的名称与方法相同。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#avoidfieldnamematchingmethodname">
+        <description>
+字段名称与方法相同可能会引起混淆。虽然这是允许的，但将信息（字段）和行为（方法）混合在一起的命名方式并不清晰。熟悉 Smalltalk 的开发人员通常偏好这种方法，因为方法表示访问器方法。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//FieldDeclaration/VariableDeclarator/VariableId
+    [some $method in ../../..[self::ClassBody or self::EnumBody]/MethodDeclaration
+     satisfies lower-case(@Name) = lower-case($method/@Name)]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+    Object bar;
+    // bar is data or an action or both?
+    void bar() {
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidFieldNameMatchingTypeName"
+          language="java"
+          since="3.0"
+          message="字段名称与声明类名称相匹配可能会有些混淆。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#avoidfieldnamematchingtypename">
+        <description>
+这可能意味着类型和/或字段名称应该更仔细地选择。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//FieldDeclaration/VariableDeclarator/VariableId
+    [lower-case(@Name) = lower-case(ancestor::ClassDeclaration[1]/@SimpleName)]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo extends Bar {
+    int foo;    // There is probably a better name that can be used
+}
+public interface Operation {
+    int OPERATION = 1; // There is probably a better name that can be used
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidInstanceofChecksInCatchClause"
+          language="java"
+          since="3.0"
+          message="正在对捕获的异常执行 instanceof 检查。应为此异常类型创建一个单独的 catch 块。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#avoidinstanceofchecksincatchclause">
+        <description>
+每种捕获的异常类型应在其自己的 catch 块中处理。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//CatchParameter
+    /following-sibling::Block//InfixExpression[@Operator = 'instanceof']
+        /VariableAccess[@Name = ./ancestor::Block/preceding-sibling::CatchParameter/@Name]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+try { // Avoid this
+    // do something
+} catch (Exception ee) {
+    if (ee instanceof IOException) {
+        cleanup();
+    }
+}
+
+try {  // Prefer this:
+    // do something
+} catch (IOException ee) {
+    cleanup();
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidLiteralsInIfCondition"
+          language="java"
+          since="4.2.6"
+          message="避免在 if 语句中使用字面量。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#avoidliteralsinifcondition">
+        <description>
+避免在条件语句中使用硬编码的字面量。通过将它们声明为静态变量或具有描述性名称的私有成员，可以提高可维护性。默认情况下，字面量 "-1" 和 "0" 会被忽略。可以通过属性 "ignoreMagicNumbers" 定义更多的例外。
+
+规则默认不考虑更深层的表达式，但可以通过属性 `ignoreExpressions` 启用。如果将此属性设置为 false，类似 `i == 1 + 5` 的 if 条件也会被报告。请注意，在这种情况下，如果表达式涉及多个字面量，属性 ignoreMagicNumbers 将不被考虑。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="ignoreMagicNumbers"
+                      description="Comma-separated list of magic numbers, that should be ignored"
+                      type="String" value="-1,0"/>
+            <property name="ignoreExpressions"
+                      description="If true, only literals in simple if conditions are considered. Otherwise literals in expressions are checked, too."
+                      type="Boolean" value="true"/>
+            <property name="xpath">
+                <value>
+<![CDATA[
+(: simple case - no deep expressions - this is always executed :)
+//IfStatement/*[1]/*[pmd-java:nodeIs('Literal')]
+    [not(pmd-java:nodeIs('NullLiteral'))]
+    [not(pmd-java:nodeIs('BooleanLiteral'))]
+    [empty(index-of(tokenize($ignoreMagicNumbers, '\s*,\s*'), @Image))]
+|
+(: consider also deeper expressions :)
+//IfStatement[$ignoreExpressions = false()]/*[1]//*[not(self::UnaryExpression[@Operator = '-'])]/*[pmd-java:nodeIs('Literal')]
+    [not(pmd-java:nodeIs('NullLiteral'))]
+    [not(pmd-java:nodeIs('BooleanLiteral'))]
+    [empty(index-of(tokenize($ignoreMagicNumbers, '\s*,\s*'), @Image))]
+|
+(: consider negative literals :)
+//IfStatement[$ignoreExpressions = false()]/*[1]//UnaryExpression[@Operator = '-']/*[pmd-java:nodeIs('Literal')]
+    [not(pmd-java:nodeIs('NullLiteral'))]
+    [not(pmd-java:nodeIs('BooleanLiteral'))]
+    [empty(index-of(tokenize($ignoreMagicNumbers, '\s*,\s*'), concat('-', @Image)))]
+|
+(: consider multiple literals in expressions :)
+//IfStatement[$ignoreExpressions = false()]/*[1][count(*[pmd-java:nodeIs('Literal')]
+    [not(pmd-java:nodeIs('NullLiteral'))]
+    [not(pmd-java:nodeIs('BooleanLiteral'))]) > 1]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+private static final int MAX_NUMBER_OF_REQUESTS = 10;
+
+public void checkRequests() {
+
+    if (i == 10) {                        // magic number, buried in a method
+      doSomething();
+    }
+
+    if (i == MAX_NUMBER_OF_REQUESTS) {    // preferred approach
+      doSomething();
+    }
+
+    if (aString.indexOf('.') != -1) {}     // magic number -1, by default ignored
+    if (aString.indexOf('.') >= 0) { }     // alternative approach
+
+    if (aDouble > 0.0) {}                  // magic number 0.0
+    if (aDouble >= Double.MIN_VALUE) {}    // preferred approach
+
+    // with rule property "ignoreExpressions" set to "false"
+    if (i == pos + 5) {}  // violation: magic number 5 within an (additive) expression
+    if (i == pos + SUFFIX_LENGTH) {} // preferred approach
+    if (i == 5 && "none".equals(aString)) {} // 2 violations: magic number 5 and literal "none"
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidLosingExceptionInformation"
+          since="4.2.6"
+          language="java"
+          message="避免在 catch 块中调用异常的访问器而不使用信息。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#avoidlosingexceptioninformation">
+        <description>
+调用异常的访问器而不使用其返回结果只会增加代码大小。应删除调用，或使用返回结果。
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//CatchClause/Block/ExpressionStatement/MethodCall[
+    pmd-java:matchesSig("java.lang.Throwable#getMessage()")
+    or pmd-java:matchesSig("java.lang.Throwable#getLocalizedMessage()")
+    or pmd-java:matchesSig("java.lang.Throwable#getCause()")
+    or pmd-java:matchesSig("java.lang.Throwable#getStackTrace()")
+    or pmd-java:matchesSig("java.lang.Object#toString()")
+]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public void bar() {
+    try {
+        // do something
+    } catch (SomeException se) {
+        se.getMessage();
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidMultipleUnaryOperators"
+          language="java"
+          since="4.2"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          message="使用多个一元运算符可能是一个错误，或者会引起混淆。"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#avoidmultipleunaryoperators">
+        <description>
+确保这种用法不是错误，或考虑简化表达式。
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+                    (: Only report on the toplevel one :)
+                    //UnaryExpression[UnaryExpression and not(parent::UnaryExpression)]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+// These are typo bugs, or at best needlessly complex and confusing:
+int i = - -1;
+int j = + - +1;
+int z = ~~2;
+boolean b = !!true;
+boolean c = !!!true;
+
+// These are better:
+int i = 1;
+int j = -1;
+int z = 2;
+boolean b = true;
+boolean c = false;
+
+// And these just make your brain hurt:
+int i = ~-2;
+int j = -~7;
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidUsingOctalValues"
+          language="java"
+          since="3.9"
+          message="除非是八进制值，否则不要以 0 开始字面量。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.AvoidUsingOctalValuesRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#avoidusingoctalvalues">
+        <description>
+整数字面量不应以零开头，因为这表示剩余的字面量将被解释为八进制值。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+int i = 012;    // set i with 10 not 12
+int j = 010;    // set j with 8 not 10
+k = i * j;      // set k with 80 not 120
+]]>
+        </example>
+    </rule>
+
+    <rule name="BrokenNullCheck"
+          language="java"
+          since="3.8"
+          message="这个表达式会抛出 NullPointerException。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.BrokenNullCheckRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#brokennullcheck">
+        <description>
+null 检查是错误的，因为它本身会抛出 NullPointerException。很可能是你使用了 || 代替 &amp;&amp;，或反之。
+        </description>
+        <priority>2</priority>
+        <example>
+<![CDATA[
+public String bar(String string) {
+  // should be &&
+    if (string!=null || !string.equals(""))
+        return string;
+  // should be ||
+    if (string==null && string.equals(""))
+        return string;
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="CallSuperFirst"
+          since="4.2.5"
+          language="java"
+          message="`super` 应该在方法开始时被调用。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#callsuperfirst">
+        <description>`super` 应该在方法开始时被调用。</description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ClassDeclaration
+    [
+      pmd-java:typeIs('android.app.Activity') or
+      pmd-java:typeIs('android.app.Application') or
+      pmd-java:typeIs('android.app.Service')
+    ]
+    //MethodDeclaration
+    [
+      @Name=('onCreate', 'onConfigurationChanged', 'onPostCreate', 'onPostResume', 'onRestart',
+             'onRestoreInstanceState', 'onResume', 'onStart')
+    ]
+    [not(Block/*[1]/MethodCall[SuperExpression][@MethodName = ancestor::MethodDeclaration/@Name])]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+import android.app.Activity;
+import android.os.Bundle;
+
+public class DummyActivity extends Activity {
+    public void onCreate(Bundle bundle) {
+        // missing call to super.onCreate(bundle)
+        foo();
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="CallSuperLast"
+          since="4.2.5"
+          language="java"
+          message="`super` 应该在方法末尾被调用。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#callsuperlast">
+        <description>
+`super` 应该在方法末尾被调用。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ClassDeclaration
+    [
+      pmd-java:typeIs('android.app.Activity') or
+      pmd-java:typeIs('android.app.Application') or
+      pmd-java:typeIs('android.app.Service')
+    ]
+    //MethodDeclaration
+    [
+      @Name=('finish', 'onDestroy', 'onPause', 'onSaveInstanceState', 'onStop', 'onTerminate')
+    ]
+    [not(Block/*[last()]/MethodCall[SuperExpression][@MethodName = ancestor::MethodDeclaration/@Name])]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+import android.app.Activity;
+
+public class DummyActivity extends Activity {
+    public void onPause() {
+        foo();
+        // missing call to super.onPause()
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="CheckSkipResult"
+          language="java"
+          since="5.0"
+          message="检查 InputStream 的 skip() 方法返回的值，以确定请求的字节数是否已被跳过。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.CheckSkipResultRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#checkskipresult">
+        <description>
+skip() 方法可能跳过的字节数少于请求的字节数。检查返回值以确定是否发生了这种情况。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Foo {
+
+   private FileInputStream _s = new FileInputStream("file");
+
+   public void skip(int n) throws IOException {
+      _s.skip(n); // You are not sure that exactly n bytes are skipped
+   }
+
+   public void skipExactly(int n) throws IOException {
+      while (n != 0) {
+         long skipped = _s.skip(n);
+         if (skipped == 0)
+            throw new EOFException();
+         n -= skipped;
+      }
+   }
+]]>
+        </example>
+    </rule>
+
+    <rule name="ClassCastExceptionWithToArray"
+          language="java"
+          since="3.4"
+          message="这种使用 Collection.toArray() 方法的方式会抛出 ClassCastException。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#classcastexceptionwithtoarray">
+        <description>
+在从 Collection 派生特定类的数组时，应提供与 `toArray()` 方法参数相同类的数组。否则会导致 `ClassCastException`。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//CastExpression[ArrayType/ClassType[not(pmd-java:typeIsExactly('java.lang.Object'))]]
+    /MethodCall[pmd-java:matchesSig("java.util.Collection#toArray()")]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+Collection c = new ArrayList();
+Integer obj = new Integer(1);
+c.add(obj);
+
+    // this would trigger the rule (and throw a ClassCastException if executed)
+Integer[] a = (Integer [])c.toArray();
+
+   // this is fine and will not trigger the rule
+Integer[] b = (Integer [])c.toArray(new Integer[0]);
+]]>
+        </example>
+    </rule>
+
+    <rule name="CloneMethodMustBePublic"
+          language="java"
+          since="5.4.0"
+          message="如果类实现了 Cloneable 接口，则 clone() 方法必须是 public。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#clonemethodmustbepublic">
+        <description>
+Java 手册指出：“按照惯例，实现此接口的类应该用 public 方法重写 Object.clone（它是 protected）。”
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodDeclaration[not(pmd-java:modifiers() = "public")]
+    [@Name = 'clone']
+    [@Arity = 0]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo implements Cloneable {
+    @Override
+    protected Object clone() throws CloneNotSupportedException { // Violation, must be public
+    }
+}
+
+public class Foo implements Cloneable {
+    @Override
+    protected Foo clone() { // Violation, must be public
+    }
+}
+
+public class Foo implements Cloneable {
+    @Override
+    public Object clone() // Ok
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="CloneMethodMustImplementCloneable"
+          language="java"
+          since="1.9"
+          message="clone() 方法仅在实现了 Cloneable 接口时才应实现。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.CloneMethodMustImplementCloneableRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#clonemethodmustimplementcloneable">
+        <description>
+clone() 方法只有在类实现了 Cloneable 接口时才应实现，但如果是一个仅抛出 CloneNotSupportedException 的 final 方法，则除外。
+
+该规则还可以检测类是否实现或扩展了 Cloneable 类。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class MyClass {
+ public Object clone() throws CloneNotSupportedException {
+  return foo;
+ }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="CloneMethodReturnTypeMustMatchClassName"
+          language="java"
+          minimumLanguageVersion="1.5"
+          since="5.4.0"
+          message="如果一个类实现了 `Cloneable` 接口，`clone()` 方法的返回类型必须是类名。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#clonemethodreturntypemustmatchclassname">
+        <description>
+这样，调用 `clone` 方法的代码就不需要将返回的克隆对象强制转换为正确的类型。
+
+注意：这种协变返回类型仅在 Java 1.5 或更高版本中可用。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodDeclaration
+    [@Name = 'clone']
+    [@Arity = 0]
+    [ClassType[1]/@SimpleName != ancestor::ClassDeclaration[1]/@SimpleName]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo implements Cloneable {
+    @Override
+    protected Object clone() { // Violation, Object must be Foo
+    }
+}
+
+public class Foo implements Cloneable {
+    @Override
+    public Foo clone() { //Ok
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="CloseResource"
+          language="java"
+          since="1.2.2"
+          message="确保像 `{0}` 这样的资源在使用后被关闭。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.CloseResourceRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#closeresource">
+        <description>
+确保在使用后总是关闭资源（如 `java.sql.Connection`、`java.sql.Statement`、`java.sql.ResultSet` 对象以及任何 `java.lang.AutoCloseable` 的子类型）。否则可能导致资源泄漏。
+
+注意：配置超类型（如 `java.lang.AutoCloseable`）即可使此规则自动应用于任何子类型（例如 `java.io.FileInputStream`）。另外，指定 `java.sql.Connection` 有助于检测类型，尤其是在类型解析或附加类路径未正确设置的情况下。
+
+注意：自 PMD 6.16.0 起，属性 `types` 的默认值包含 `java.lang.AutoCloseable`，并现在检测涉及标准 `java.io.*Stream` 类的情况。如需恢复旧行为，请从 `types` 中移除 "AutoCloseable"。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Bar {
+    public void withSQL() {
+        Connection c = pool.getConnection();
+        try {
+            // do stuff
+        } catch (SQLException ex) {
+           // handle exception
+        } finally {
+            // oops, should close the connection using 'close'!
+            // c.close();
+        }
+    }
+
+    public void withFile() {
+        InputStream file = new FileInputStream(new File("/tmp/foo"));
+        try {
+            int c = file.in();
+        } catch (IOException e) {
+            // handle exception
+        } finally {
+            // TODO: close file
+        }
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="CompareObjectsWithEquals"
+          language="java"
+          since="3.2"
+          message="使用 `equals()` 来比较对象引用。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#compareobjectswithequals">
+        <description>
+避免使用 `==` 进行比较。
+
+由于在某些情况下（例如，定义用于哨兵值的常量时）比较对象与命名常量是有用的，因此规则会忽略对全大写名称字段（例如 `this == SENTINEL`）的比较，这是常见的常量字段命名约定。
+
+您可以通过在 `typesThatCompareByReference` 属性中列出例外类型来允许某些类型按引用进行比较。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="typesThatCompareByReference" type="List[String]" description="List of canonical type names for which reference comparison is allowed.">
+                <value>java.lang.Enum,java.lang.Class</value>
+            </property>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//InfixExpression
+    [@Operator = ("==", "!=")]
+    [count(*
+        [not(self::NullLiteral)]
+        [pmd-java:typeIs('java.lang.Object')]
+        [not(some $t in $typesThatCompareByReference satisfies pmd-java:typeIs($t))]
+      ) = 2
+    ]
+    [not(ancestor::MethodDeclaration[1][@Name = "equals"])]
+    (: Is not a field access with an all-caps identifier :)
+    [not(FieldAccess[upper-case(@Name)=@Name]
+     or VariableAccess[upper-case(@Name)=@Name])]
+]]>
+        </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+class Foo {
+  boolean bar(String a, String b) {
+    return a == b;
+  }
+}
+
+]]>
+        </example>
+    </rule>
+
+    <rule name="ComparisonWithNaN"
+          language="java"
+          since="6.36.0"
+          message="与 NaN 的比较总是返回 false。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#comparisonwithnan">
+        <description><![CDATA[
+报告与 `double` 和 `float` 类型的 `NaN`（非数值）值的比较。这些比较具有非直观的行为：`NaN` 被认为不等于自身。这意味着像 `someDouble == Double.NaN` 这样的检查将始终返回 false，即使 `someDouble` 确实是 NaN 值。要测试一个值是否是 NaN 值，应该使用 `Double.isNaN(someDouble)`（或 `Float.isNaN`）。`!=` 操作符也应类似对待。最后，像 `someDouble <= Double.NaN` 这样的比较是毫无意义的，始终会评估为 false。
+
+该规则在 PMD 6.36.0 中已重命名为 "BadComparison"。
+        ]]></description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+//InfixExpression[@Operator = ("==", "!=", "<=", ">=", "<", ">")]/FieldAccess[@Name='NaN' and (pmd-java:typeIs('double') or pmd-java:typeIs('float'))]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+boolean x = (y == Double.NaN);
+]]>
+        </example>
+    </rule>
+
+    <rule name="ConfusingArgumentToVarargsMethod"
+          language="java"
+          since="7.1.0"
+          message="不清楚是打算使用 varargs 还是非 varargs 调用。将其强制转换为 `{0}` 或 `{0}[]`，或者将 varargs 参数分开传递以明确意图。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.ConfusingArgumentToVarargsMethodRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#confusingargumenttovarargsmethod">
+        <description>
+报告传递给 varargs 方法的参数可能会引起混淆的情况。
+
+这可能发生在将数组作为单个 varargs 参数传递时，如果数组类型与 varargs 方法预期的数组类型不完全匹配。如果该数组是预期数组类型的组件类型的子类型，则可能不清楚调用的 varargs 方法将收到什么值。例如，如果你有以下代码：
+
+```java
+void varargs(Object... parm);
+```
+
+并且像这样调用它：
+
+```java
+varargs(new String[]{"a"});
+```
+
+不清楚你是打算让方法接收到值 `new Object[]{ new String[] {"a"} }` 还是仅仅 `new String[] {"a"}`（后者发生了）。这种混淆发生是因为 `String[]` 是 `Object[]` 和 `Object` 的子类型。为了明确你的意图，可以使用强制转换或单独传递元素，如下所示：
+
+```java
+// varargs 调用
+// parm 将是 `new Object[] { "a" }`
+varargs("a");
+
+// 非 varargs 调用
+// parm 将是 `new String[] { "a" }`
+varargs((Object[]) new String[]{"a"});
+
+// varargs 调用
+// parm 将是 `new Object[] { new String[] { "a" } }`
+varargs((Object) new String[]{"a"});
+```
+
+另一个令人困惑的情况是，当你将 `null` 作为 varargs 参数传递时。在这种情况下，不清楚你是打算传递一个包含单个 null 元素的数组，还是一个 null 数组（后者发生了）。这同样可以通过强制转换来澄清。
+        </description>
+        <priority>3</priority>
+        <example><![CDATA[
+            import java.util.Arrays;
+
+            abstract class C {
+                abstract void varargs(Object... args);
+                static {
+                    varargs(new String[] { "a" });
+                    varargs(null);
+                }
+            }
+            ]]></example>
+    </rule>
+
+    <rule name="ConstructorCallsOverridableMethod"
+          language="java"
+          since="1.04"
+          message="可被重写的 {0} 在对象构造期间被调用 {1}"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.ConstructorCallsOverridableMethodRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#constructorcallsoverridablemethod">
+        <description>
+报告在对象初始化期间调用可被重写的方法。这些方法在对象尚未完全构造完成时被调用，如果方法被重写，可能会导致调试困难。这是因为子类通常假设超类在所有方法中都已完全初始化。如果不是这样，可能会在构造函数中出现错误，例如一些字段可能仍为 null，可能导致 NullPointerException，或者以其他方式存储，导致后续问题。
+
+为了避免此问题，仅在构造函数中使用静态、私有或 final 方法。注意，这些方法也不能通过传递调用可被重写的方法以确保安全。
+        </description>
+        <priority>1</priority>
+        <example>
+<![CDATA[
+public class SeniorClass {
+  public SeniorClass(){
+      toString(); //may throw NullPointerException if overridden
+  }
+  public String toString(){
+    return "IAmSeniorClass";
+  }
+}
+public class JuniorClass extends SeniorClass {
+  private String name;
+  public JuniorClass(){
+    super(); //Automatic call leads to NullPointerException
+    name = "JuniorClass";
+  }
+  public String toString(){
+    return name.toUpperCase();
+  }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="DetachedTestCase"
+          language="java"
+          since="6.13.0"
+          message="可能是脱离的 JUnit 测试用例。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.DetachedTestCaseRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#detachedtestcase">
+        <description>
+该方法似乎是一个测试用例，因为它具有公共或默认可见性、非静态访问、无参数、无返回值，并且没有注解，但它是一个包含一个或多个 JUnit 测试用例的类的成员。如果它是一个工具方法，则应该具有私有可见性。如果它是被忽略的测试，则应该用 @Test 和 @Ignore 注解。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class MyTest {
+    @Test
+    public void someTest() {
+    }
+
+    // violation: Not annotated
+    public void someOtherTest () {
+    }
+
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="DoNotCallGarbageCollectionExplicitly"
+          language="java"
+          since="4.2"
+          message="不要显式触发垃圾回收。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#donotcallgarbagecollectionexplicitly">
+        <description>
+调用 `System.gc()`、`Runtime.getRuntime().gc()` 和 `System.runFinalization()` 不建议使用。代码的行为应该与是否使用 `-Xdisableexplicitgc` 选项禁用显式垃圾回收相同。
+
+此外，“现代” JVM 在处理垃圾回收方面表现非常出色。如果应用程序出现与内存泄漏无关的内存使用问题，应通过 JVM 选项来解决，而不是在代码中处理。
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodCall[
+       pmd-java:matchesSig("java.lang.System#gc()")
+    or pmd-java:matchesSig("java.lang.Runtime#gc()")
+    or pmd-java:matchesSig("java.lang.System#runFinalization()")
+    or pmd-java:matchesSig("java.lang.Runtime#runFinalization()")
+]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class GCCall {
+    public GCCall() {
+        // Explicit gc call !
+        System.gc();
+    }
+
+    public void doSomething() {
+        // Explicit gc call !
+        Runtime.getRuntime().gc();
+    }
+
+    public explicitGCcall() {
+        // Explicit gc call !
+        System.gc();
+    }
+
+    public void doSomething() {
+        // Explicit gc call !
+        Runtime.getRuntime().gc();
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="DoNotExtendJavaLangThrowable"
+          language="java"
+          since="6.0.0"
+          message="异常不应直接继承 `java.lang.Throwable`。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#donotextendjavalangthrowable">
+        <description>
+应该继承 `Exception` 或 `RuntimeException`。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ClassDeclaration/ExtendsList/ClassType
+  [pmd-java:typeIsExactly('java.lang.Throwable')]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo extends Throwable { }
+]]>
+        </example>
+    </rule>
+
+    <rule name="DoNotHardCodeSDCard"
+          since="4.2.6"
+          language="java"
+          message="请不要硬编码 `/sdcard`。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#donothardcodesdcard">
+        <description>
+应使用 `Environment.getExternalStorageDirectory()` 替代 `/sdcard`。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>//StringLiteral[starts-with(@Image,'"/sdcard')]</value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class MyActivity extends Activity {
+    protected void foo() {
+        String storageLocation = "/sdcard/mypackage";   // hard-coded, poor approach
+
+       storageLocation = Environment.getExternalStorageDirectory() + "/mypackage"; // preferred approach
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="DoNotTerminateVM"
+          language="java"
+          since="4.1"
+          message="在 J2EE/JEE 应用程序中不应使用 `System.exit()`。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#donotterminatevm">
+        <description>
+Web 应用程序不应调用 `System.exit()`，因为只有 Web 容器或应用服务器才应停止 JVM。否则，Web 应用程序会终止同一应用服务器上运行的所有其他应用程序。
+
+此规则还检查等效的调用 `Runtime.getRuntime().exit()` 和 `Runtime.getRuntime().halt()`。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//(MethodDeclaration[@MainMethod = false()] | Initializer)//MethodCall[
+    pmd-java:matchesSig("java.lang.System#exit(int)")
+    or pmd-java:matchesSig("java.lang.Runtime#exit(int)")
+    or pmd-java:matchesSig("java.lang.Runtime#halt(int)")
+]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public void bar() {
+    System.exit(0);                 // never call this when running in an application server!
+}
+public void foo() {
+    Runtime.getRuntime().exit(0);   // never stop the JVM manually, the container will do this.
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="DoNotThrowExceptionInFinally"
+          language="java"
+          since="4.2"
+          message="在 `finally` 块中抛出异常会使控制流难以理解。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#donotthrowexceptioninfinally">
+        <description>
+在 `finally` 块中抛出异常会引起混淆，因为它们可能掩盖其他异常或代码缺陷。
+
+注意：这是 PMD 实现的 Lint4j 规则 "A throw in a finally block"。
+        </description>
+        <priority>4</priority>
+        <properties>
+            <property name="xpath">
+                <value>//FinallyClause[descendant::ThrowStatement]</value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+    public void bar() {
+        try {
+            // Here do some stuff
+        } catch( Exception e) {
+            // Handling the issue
+        } finally {
+            // is this really a good idea ?
+            throw new Exception();
+        }
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="DontImportSun"
+          language="java"
+          since="1.5"
+          message="避免导入任何 `sun.*` 包中的内容。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#dontimportsun">
+        <description>
+避免导入 `sun.*` 包中的内容，因为这些包不具备可移植性，且可能会发生变化。
+
+如果你发现自己必须依赖 Sun 的 API，请将这种依赖限制在尽可能小的范围内，例如，通过编写一个稳定的封装类来包装不稳定的 API。然后，你可以在封装类的实现中抑制此规则。
+        </description>
+        <priority>4</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+//ImportDeclaration[starts-with(@ImportedName, 'sun.')]
+]]>
+                </value>
+            </property>
+
+        </properties>
+        <example>
+<![CDATA[
+import sun.misc.foo;
+public class Foo {}
+]]>
+        </example>
+    </rule>
+
+    <rule name="DontUseFloatTypeForLoopIndices"
+          language="java"
+          since="4.3"
+          message="不要使用浮点数作为循环索引。如果必须使用浮点数，请使用 `double`。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#dontusefloattypeforloopindices">
+        <description>
+不要使用浮点数作为循环索引。如果必须使用浮点数，请使用 `double`，除非你确定 `float` 提供了足够的精度，并且有迫切的性能需求（空间或时间）。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ForStatement/ForInit//VariableId[pmd-java:typeIs('float')]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Count {
+  public static void main(String[] args) {
+    final int START = 2000000000;
+    int count = 0;
+    for (float f = START; f < START + 50; f++)
+      count++;
+      //Prints 0 because (float) START == (float) (START + 50).
+      System.out.println(count);
+      //The termination test misbehaves due to floating point granularity.
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="EmptyCatchBlock"
+          language="java"
+          since="0.1"
+          message="避免空的捕获块。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#emptycatchblock">
+        <description>
+`Empty Catch Block` 查找捕获异常但不执行任何操作的实例。在大多数情况下，这会吞没异常，异常应该被处理或报告。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//CatchClause[
+  Block[
+      count(*) = 0
+      and ($allowCommentedBlocks = false() or @containsComment = false())
+  ]
+  and CatchParameter/VariableId[not(matches(@Name, $allowExceptionNameRegex))]
+]
+]]>
+                </value>
+            </property>
+            <property name="allowCommentedBlocks" type="Boolean" description="Empty blocks containing comments will be skipped" value="false"/>
+            <property name="allowExceptionNameRegex" type="Regex" description="Empty blocks catching exceptions with names matching this regular expression will be skipped" value="^(ignored|expected)$"/>
+        </properties>
+        <example>
+<![CDATA[
+public void doSomething() {
+    try {
+        FileInputStream fis = new FileInputStream("/tmp/bugger");
+    } catch (IOException ioe) {
+        // not good
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="EmptyFinalizer"
+          language="java"
+          since="1.5"
+          message="避免空的 `finalize` 方法。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#emptyfinalizer">
+        <description>
+空的 `finalize` 方法没有任何作用，应该被移除。请注意，Oracle 从 JDK 9 开始已将 `Object.finalize()` 标记为已弃用。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodDeclaration[@Name='finalize'][@Arity = 0]
+  /Block[not(*)]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+   protected void finalize() {}
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="EqualsNull"
+          language="java"
+          since="1.9"
+          message="避免使用 `equals()` 方法来比较 `null`。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#equalsnull">
+        <description>
+测试 `null` 时应使用 `==` 操作符，而不是 `equals()` 方法。
+        </description>
+        <priority>1</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodCall[@MethodName = "equals" and ArgumentList[count(*) = 1 and NullLiteral]]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+String x = "foo";
+
+if (x.equals(null)) {   // bad form
+    doSomething();
+}
+
+if (x == null) {        // preferred
+    doSomething();
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="FinalizeDoesNotCallSuperFinalize"
+          language="java"
+          since="1.5"
+          message="如果实现了 `finalize()` 方法，其最后一个操作应该是调用 `super.finalize()`。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#finalizedoesnotcallsuperfinalize">
+        <description>
+请注意，从 JDK 9 开始，Oracle 已经将 `Object.finalize()` 标记为废弃。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<!-- in English: a method declaration of finalize(), with no arguments, containing
+a block whose last statement is NOT a call to super.finalize -->
+<![CDATA[
+//MethodDeclaration[@Name = "finalize"][@Arity = 0]
+   /Block/*[last()]
+      [not(MethodCall[@MethodName = "finalize"]/SuperExpression)]
+      [not(FinallyClause/Block/ExpressionStatement/
+          MethodCall[@MethodName = "finalize"]/SuperExpression)]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+protected void finalize() {
+    something();
+    // neglected to call super.finalize()
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="FinalizeOnlyCallsSuperFinalize"
+          language="java"
+          since="1.5"
+          message="如果实现了 `finalize()` 方法，它应该做一些操作，而不仅仅是调用 `super.finalize()`。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#finalizeonlycallssuperfinalize">
+        <description>
+请注意，从 JDK 9 开始，Oracle 已经将 `Object.finalize()` 标记为废弃。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodDeclaration[@Name='finalize'][@Arity = 0]
+   [Block[@Size=1]/ExpressionStatement/MethodCall[@MethodName = "finalize"][SuperExpression]]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+protected void finalize() {
+    super.finalize();
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="FinalizeOverloaded"
+          language="java"
+          since="1.5"
+          message="`finalize()` 方法不应被重载。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#finalizeoverloaded">
+        <description>
+名为 `finalize()` 的方法不应有参数，因为这会造成混淆，并且很可能是尝试重载 `Object.finalize()`。这样的重载不会被 JVM 调用。
+
+请注意，从 JDK 9 开始，Oracle 已经将 `Object.finalize()` 标记为废弃。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodDeclaration[@Name='finalize'][@Arity > 0]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+    // this is confusing and probably a bug
+    protected void finalize(int a) {
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="FinalizeShouldBeProtected"
+          language="java"
+          since="1.1"
+          message="如果重写 `finalize()` 方法，应该将其设置为 `protected`。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#finalizeshouldbeprotected">
+        <description>
+如果将其设为 `public`，其他类可能会在不适当的时间调用它。
+
+请注意，从 JDK 9 开始，Oracle 已经将 `Object.finalize()` 标记为废弃。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodDeclaration[@Visibility != "protected"][@Name='finalize'][@Arity = 0]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public void finalize() {
+    // do something
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="IdempotentOperations"
+          language="java"
+          since="2.0"
+          message="避免使用幂等操作（例如将变量赋值给自身）。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.IdempotentOperationsRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#idempotentoperations">
+        <description>
+这些操作没有实际效果。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Foo {
+ public void bar() {
+  int x = 2;
+  x = x;
+ }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ImplicitSwitchFallThrough"
+          language="java"
+          since="3.0"
+          message="这个 `switch` 语句的 `case` 可能会因前一个 `case` 的贯穿到达。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.ImplicitSwitchFallThroughRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#implicitswitchfallthrough">
+        <description>
+没有 `break` 或 `return` 语句的 `switch` 语句可能表示存在问题行为。空 `case` 被忽略，因为这些表示意图上的贯穿。
+
+可以通过在被贯穿到达的 `case` 标签之前添加 `// fallthrough` 注释，或使用 `@SuppressWarnings("fallthrough")` 来忽略此规则的违规。
+
+该规则在 PMD 6.37.0 中被重命名为“MissingBreakInSwitch”。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public void bar(int status) {
+    switch(status) {
+      case CANCELLED:
+        doCancelled();
+        // break; hm, should this be commented out?
+      case NEW:
+        doNew();
+        // is this really a fall-through?
+        // what happens if you add another case after this one?
+      case REMOVED:
+        doRemoved();
+        // fallthrough - this comment just clarifies that you want a fallthrough
+      case OTHER: // empty case - this is interpreted as an intentional fall-through
+      case ERROR:
+        doErrorHandling();
+        break;
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="InstantiationToGetClass"
+          language="java"
+          since="2.0"
+          message="避免仅为了调用 getClass() 方法而实例化一个对象；请使用 .class 公共成员代替。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#instantiationtogetclass">
+        <description>
+避免仅为了调用 getClass() 方法而实例化一个对象；请使用 .class 公共成员代替。
+        </description>
+        <priority>4</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodCall
+ [@MethodName='getClass']
+ [ConstructorCall]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+// replace this
+Class c = new String().getClass();
+
+// with this:
+Class c = String.class;
+]]>
+        </example>
+    </rule>
+
+    <rule name="InvalidLogMessageFormat"
+          language="java"
+          since="5.5.0"
+          message="无效的消息格式。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.InvalidLogMessageFormatRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#invalidlogmessageformat">
+        <description>
+检查 slf4j 和 log4j2 日志记录器中参数数量与占位符不匹配的消息。
+
+自 6.32.0 起，除了参数化的消息占位符 (`{}`) 外，还支持字符串格式化消息的格式说明符 (`%s`)。
+
+该规则在 PMD 6.19.0 中被重命名为 "InvalidSlf4jMessageFormat"。
+        </description>
+        <priority>5</priority>
+        <example>
+<![CDATA[
+LOGGER.error("forget the arg {}");
+LOGGER.error("forget the arg %s");
+LOGGER.error("too many args {}", "arg1", "arg2");
+LOGGER.error("param {}", "arg1", new IllegalStateException("arg")); //The exception is shown separately, so is correct.
+]]>
+        </example>
+    </rule>
+
+    <rule name="JumbledIncrementer"
+          language="java"
+          since="1.0"
+          message="避免在内循环的更新表达式中修改外循环的增量变量。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#jumbledincrementer">
+        <description>
+避免混乱的循环增量变量——这通常是一个错误，即使有意为之也很令人困惑。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+//ForStatement
+    [not(ForInit) or ForInit//VariableId/@Name != ForUpdate//VariableAccess/@Name]
+    [ForUpdate//VariableAccess[@AccessType = 'WRITE']/@Name
+     =
+     ancestor::ForStatement/ForInit//VariableId/@Name
+    ]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+ <![CDATA[
+public class JumbledIncrementerRule1 {
+    public void foo() {
+        for (int i = 0; i < 10; i++) {          // only references 'i'
+            for (int k = 0; k < 20; i++) {      // references both 'i' and 'k'
+                System.out.println("Hello");
+            }
+        }
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="JUnitSpelling"
+          language="java"
+          since="1.0"
+          message="您可能拼写错误了 JUnit 框架的方法（setUp 或 tearDown）。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.JUnitSpellingRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#junitspelling">
+        <description>
+在 JUnit 3 中，setUp 方法用于设置运行测试所需的所有数据实体。tearDown 方法用于清理运行测试所需的所有数据实体。如果您希望测试正确地设置和清理所有内容，不应拼写错误这些方法名称。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+import junit.framework.*;
+
+public class Foo extends TestCase {
+    public void setup() {}    // oops, should be setUp
+    public void TearDown() {} // oops, should be tearDown
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="JUnitStaticSuite"
+          language="java"
+          since="1.0"
+          message="您有一个 suite() 方法，但它既不是 public 也不是 static，因此 JUnit 不会调用它来获取您的 TestSuite。这是您想要的效果吗？"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.JUnitStaticSuiteRule"
+          typeResolution="true"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#junitstaticsuite">
+        <description>
+`suite()` 方法在 JUnit 测试中需要同时是 public 和 static 的。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+import junit.framework.*;
+
+public class Foo extends TestCase {
+    public void suite() {}         // oops, should be static
+    private static void suite() {} // oops, should be public
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="MethodWithSameNameAsEnclosingClass"
+          language="java"
+          since="1.5"
+          message="方法不应与其包含的类同名。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#methodwithsamenameasenclosingclass">
+        <description>
+这样会很混淆，因为它看起来像一个构造函数。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodDeclaration[@Name = ancestor::ClassDeclaration/@SimpleName]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class MyClass {
+
+    public MyClass() {}         // this is OK because it is a constructor
+
+    public void MyClass() {}    // this is bad because it is a method
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="MisplacedNullCheck"
+          language="java"
+          since="3.5"
+          message="这里的空值检查放置不当。如果变量''{0}''为空，会抛出 `NullPointerException`。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#misplacednullcheck">
+        <description>
+要么检查是多余的（变量永远不会为空），要么检查是不正确的。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//InfixExpression[@Operator = '&&']
+    /InfixExpression[@Operator = '!=']
+        (: one side is null :)
+        [NullLiteral]
+        (: other side checks for the variable used somewhere in the first child of conditional and expression :)
+        [VariableAccess]
+        [some $var in preceding-sibling::*//VariableAccess
+            [parent::MethodCall or parent::FieldAccess]
+            [not(ancestor::InfixExpression[@Operator = '||'])]
+            /@Name
+            satisfies $var = VariableAccess/@Name
+        ]
+    /VariableAccess
+|
+//InfixExpression[@Operator = '||']
+    /InfixExpression[@Operator = '==']
+        (: one side is null :)
+        [NullLiteral]
+        (: other side checks for the variable used somewhere in the first child of conditional or expression :)
+        [VariableAccess]
+        [some $var in preceding-sibling::*//VariableAccess
+            [parent::MethodCall or parent::FieldAccess]
+            [not(ancestor::InfixExpression[@Operator = '&&'])]
+            /@Name
+            satisfies $var = VariableAccess/@Name
+        ]
+    /VariableAccess
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+    void bar() {
+        if (a.equals(baz) && a != null) {} // a could be null, misplaced null check
+
+        if (a != null && a.equals(baz)) {} // correct null check
+    }
+}
+]]>
+        </example>
+        <example>
+<![CDATA[
+public class Foo {
+    void bar() {
+        if (a.equals(baz) || a == null) {} // a could be null, misplaced null check
+
+        if (a == null || a.equals(baz)) {} // correct null check
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="MissingSerialVersionUID"
+          language="java"
+          since="3.0"
+          message="实现 `Serializable` 的类应该设置一个 `serialVersionUID`。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#missingserialversionuid">
+        <description>
+实现 `Serializable` 的类应该提供一个 `serialVersionUID` 字段。这个字段对于抽象基类也是必需的。在继承链中的每个类都需要一个独立的 `serialVersionUID` 字段。有关更多信息，请参见 [Should an abstract class have a serialVersionUID](https://stackoverflow.com/questions/893259/should-an-abstract-class-have-a-serialversionuid)。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ClassDeclaration
+    [@Interface = false()]
+    [count(ClassBody/FieldDeclaration/VariableDeclarator/VariableId[@Name='serialVersionUID']) = 0]
+    [(ImplementsList | ExtendsList)/ClassType[pmd-java:typeIs('java.io.Serializable')]]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo implements java.io.Serializable {
+    String name;
+    // Define serialization id to avoid serialization related bugs
+    // i.e., public static final long serialVersionUID = 4328743;
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="MissingStaticMethodInNonInstantiatableClass"
+          language="java"
+          since="3.0"
+          message="类无法被实例化，并且没有提供任何静态方法或字段。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#missingstaticmethodinnoninstantiatableclass">
+        <description>
+一个具有私有构造函数且没有任何静态方法或字段的类是不可用的。
+
+当一个私有构造函数被某个注解标注时，该类将不再被视为不可实例化，并且不会报告违反情况。
+请参见属性 `annotations`。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="annotations" type="List[String]" value="org.springframework.beans.factory.annotation.Autowired,javax.inject.Inject,com.google.inject.Inject" description="If a constructor is annotated with one of these annotations, then the class is ignored."/>
+            <property name="xpath">
+                <value>
+<![CDATA[
+let $topLevelClass := /*/ClassDeclaration return
+let $isLombokUtility := exists($topLevelClass[pmd-java:hasAnnotation('lombok.experimental.UtilityClass')]) return
+$topLevelClass[
+        (: non-instantiable :)
+        $isLombokUtility or
+        (
+            (: no lombok produced constructors :)
+            not(pmd-java:hasAnnotation('lombok.NoArgsConstructor') or
+                pmd-java:hasAnnotation('lombok.RequiredArgsConstructor') or
+                pmd-java:hasAnnotation('lombok.AllArgsConstructor')) and
+            (: or has non-default constructors … :)
+            ClassBody/ConstructorDeclaration and
+                (: … but only private … :)
+                not(ClassBody/ConstructorDeclaration[@Visibility != "private"]) and
+                (: … and none annotated … :)
+                (every $x in $annotations satisfies
+                      not(ClassBody/ConstructorDeclaration/ModifierList/Annotation[pmd-java:typeIs($x)]))
+        )
+    ]
+    [
+        (: With no visible static methods … :)
+        not(ClassBody/MethodDeclaration[($isLombokUtility or pmd-java:modifiers() = "static") and @Visibility != "private"]) and
+        (: … nor fields … :)
+        not(ClassBody/FieldDeclaration[($isLombokUtility or pmd-java:modifiers() = "static") and @Visibility != "private"]) and
+        (: … no nested classes, that are non-private and static … :)
+        not(ClassBody/ClassDeclaration
+            [pmd-java:modifiers() = "static" and @Visibility != "private"]
+            (: … with a default or non-private constructor … :)
+            [not(ClassBody/ConstructorDeclaration) or ClassBody/ConstructorDeclaration[@Visibility != "private"]]
+            (: … and a non-private method returning the outer class type … :)
+            [(ClassBody/MethodDeclaration
+                [@Visibility != "private"]
+                [descendant::ReturnStatement/*[1][pmd-java:typeIs(ancestor::ClassDeclaration[@Nested = false()]/@BinaryName)]]
+            ) or (
+                (: … or the inner class extends the outer class :)
+                ExtendsList/ClassType[@SimpleName = ancestor::ClassDeclaration[@Nested = false()]/@SimpleName]
+            )]
+    )]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+// This class is unusable, since it cannot be
+// instantiated (private constructor),
+// and no static method can be called.
+
+public class Foo {
+  private Foo() {}
+  void foo() {}
+}
+
+]]>
+        </example>
+    </rule>
+
+    <rule name="MoreThanOneLogger"
+          language="java"
+          since="2.0"
+          message="类包含多个日志记录器。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#morethanonelogger">
+        <description>
+通常每个类只使用一个日志记录器。此规则支持 slf4j、log4j、Java Util Logging 和 log4j2（自 6.19.0 版本起）。
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+//ClassDeclaration[
+  count(
+    ClassBody/FieldDeclaration/ClassType[
+      pmd-java:typeIs("org.apache.log4j.Logger") or
+      pmd-java:typeIs("org.apache.logging.log4j.Logger") or
+      pmd-java:typeIs("java.util.logging.Logger") or
+      pmd-java:typeIs("org.slf4j.Logger")
+    ]
+  ) > 1
+]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+    Logger log = Logger.getLogger(Foo.class.getName());
+    // It is very rare to see two loggers on a class, normally
+    // log information is multiplexed by levels
+    Logger log2= Logger.getLogger(Foo.class.getName());
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="NonCaseLabelInSwitchStatement"
+          language="java"
+          since="1.5"
+          message="在switch语句中存在一个非case标签。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#noncaselabelinswitchstatement">
+        <description>
+在switch语句中存在一个非case标签（例如，命名的break/continue标签）。
+这是合法的，但很令人困惑。很容易将case标签和非case标签混淆。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>//SwitchStatement//LabeledStatement</value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+  void bar(int a) {
+   switch (a) {
+     case 1:
+       // do something
+       break;
+     mylabel: // this is legal, but confusing!
+       break;
+     default:
+       break;
+    }
+  }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="NonSerializableClass"
+          language="java"
+          since="1.1"
+          message="字段''{0}''属于可序列化类''{1}''，但其类型''{2}''不是可序列化的。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.NonSerializableClassRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#nonserializableclass">
+        <description>
+如果一个类被标记为`Serializable`，那么所有的字段也需要是可序列化的。为了排除某个字段，可以将其标记为transient。静态字段不会被考虑。
+
+这条规则报告所有不可序列化的字段。
+
+如果一个类实现了执行手动序列化的方法（`writeObject`, `readObject`）或者使用了替代对象（`writeReplace`, `readResolve`），那么这个类会被忽略。
+
+注意：这条规则在PMD 6.52.0中进行了重构。它之前被称为"BeanMembersShouldSerialize"。
+属性`prefix`已被弃用，因为在可序列化的类中，所有字段都必须是可序列化的，不管它们的名字是什么。
+        </description>
+        <priority>3</priority>
+        <example>
+            <![CDATA[
+class Buzz implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
+
+    private transient int someFoo;          // good, it's transient
+    private static int otherFoo;            // also OK, it's static
+    private java.io.FileInputStream stream; // bad - FileInputStream is not serializable
+
+    public void setStream(FileInputStream stream) {
+        this.stream = stream;
+    }
+
+    public int getSomeFoo() {
+          return this.someFoo;
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="NonStaticInitializer"
+          language="java"
+          since="1.5"
+          message="非静态初始化器令人困惑。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#nonstaticinitializer">
+        <description>
+一个非静态初始化块将在每次调用构造函数时被调用（在调用构造函数之前）。虽然这是一个有效的语言结构，但它很少被使用，并且令人困惑。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//Initializer[@Static=false()][not(ancestor::*[3][self::ConstructorCall or self::EnumConstant])]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class MyClass {
+  // this block gets run before any call to a constructor
+  {
+    System.out.println("I am about to construct myself");
+  }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="NullAssignment"
+          language="java"
+          since="1.02"
+          message="将对象赋值为null是一种代码异味。考虑重构。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.NullAssignmentRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#nullassignment">
+        <description>
+将变量（在声明之外）赋值为"null"通常是不好的做法。有时，这种类型的赋值表明程序员可能没有完全理解代码中的操作。
+
+注意：在某些情况下，这种赋值可能被用来取消对象的引用，并鼓励垃圾收集。
+        </description>
+        <priority>3</priority>
+        <example>
+ <![CDATA[
+public void bar() {
+  Object x = null; // this is OK
+  x = new Object();
+     // big, complex piece of code here
+  x = null; // this is not required
+     // big, complex piece of code here
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="OverrideBothEqualsAndHashcode"
+          language="java"
+          since="0.4"
+          message="确保同时重写equals()和hashCode()方法。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.OverrideBothEqualsAndHashcodeRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#overridebothequalsandhashcode">
+        <description>
+同时重写公有的boolean Object.equals(Object other)和公有的int Object.hashCode()，或者两者都不重写。即使你从父类继承了一个hashCode()，也考虑实现hashCode并显式地委托给你的超类。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Bar {        // poor, missing a hashcode() method
+    public boolean equals(Object o) {
+      // do some comparison
+    }
+}
+
+public class Baz {        // poor, missing an equals() method
+    public int hashCode() {
+      // return some hash value
+    }
+}
+
+public class Foo {        // perfect, both methods provided
+    public boolean equals(Object other) {
+      // do some comparison
+    }
+    public int hashCode() {
+      // return some hash value
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ProperCloneImplementation"
+          language="java"
+          since="1.4"
+          message="对象的clone()方法应该使用super.clone()来实现。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.ProperCloneImplementationRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#propercloneimplementation">
+        <description>
+对象的clone()方法应该用super.clone()来实现。
+        </description>
+        <priority>2</priority>
+        <example>
+<![CDATA[
+class Foo{
+    public Object clone(){
+        return new Foo(); // This is bad
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ProperLogger"
+          language="java"
+          since="3.3"
+          message="日志记录器应该被定义为私有静态最终的，并且有正确的类名。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#properlogger">
+        <description>
+日志记录器通常应该被定义为私有静态最终的，并且与正确的类关联。
+`private final Log log;` 在需要传递日志记录器的罕见情况下也是允许的，限制是日志记录器需要在构造函数中传递进去。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//FieldDeclaration
+    [ClassType[pmd-java:typeIs($loggerClass)]]
+    [
+        (: check modifiers :)
+        (not(pmd-java:modifiers() = 'private') or not(pmd-java:modifiers() = 'final'))
+        (: check logger name :)
+        or (pmd-java:modifiers() = 'static' and VariableDeclarator/VariableId/@Name != $staticLoggerName)
+        or (not(pmd-java:modifiers() = 'static') and VariableDeclarator/VariableId/@Name != $loggerName)
+        (: check logger argument type matches class or enum name :)
+        or .//ArgumentList/ClassLiteral/ClassType/@SimpleName != ancestor::ClassDeclaration/@SimpleName
+        or .//ArgumentList/ClassLiteral/ClassType/@SimpleName != ancestor::EnumDeclaration/@SimpleName
+
+        (: special case - final logger initialized inside constructor :)
+        or (VariableDeclarator/@Initializer = false()
+            and not(pmd-java:modifiers() = 'static')
+            and not(ancestor::ClassBody/ConstructorDeclaration
+                //AssignmentExpression[@Operator = '=']
+                    [FieldAccess[1]/@Name = $loggerName or VariableAccess[1]/@Name = $loggerName]
+                    [*[2][@Name = ancestor::ConstructorDeclaration//FormalParameter/VariableId/@Name]])
+        )
+    ]
+]]>
+                </value>
+            </property>
+            <property name="staticLoggerName" type="String" description="Name of the static Logger variable" value="LOG"/>
+            <property name="loggerName" type="String" description="Name of the Logger instance variable" value="log"/>
+            <property name="loggerClass" type="String" description="Class name of the logger" value="org.apache.commons.logging.Log"/>
+        </properties>
+        <example>
+ <![CDATA[
+public class Foo {
+
+    private static final Log LOG = LogFactory.getLog(Foo.class);    // proper way
+
+    protected Log LOG = LogFactory.getLog(Testclass.class);         // wrong approach
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ReturnEmptyCollectionRatherThanNull"
+          language="java"
+          since="6.37.0"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          message="返回一个空集合而不是'null'。"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#returnemptycollectionratherthannull">
+        <description>
+对于任何返回集合（例如数组、Collection或Map）的方法，返回一个空集合比返回一个null引用更好。这消除了对所有结果进行null检查的需要，并避免了无意中的NullPointerExceptions。
+
+参见《Effective Java, 3rd Edition, Item 54: Return empty collections or arrays instead of null》。
+        </description>
+        <priority>1</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ReturnStatement/NullLiteral
+[ancestor::MethodDeclaration[1]
+    [ArrayType
+     or ClassType[pmd-java:typeIs('java.util.Collection')
+        or pmd-java:typeIs('java.util.Map')]]
+]
+[not(./ancestor::LambdaExpression)]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Example {
+    // Not a good idea...
+    public int[] badBehavior() {
+        // ...
+        return null;
+    }
+
+    // Good behavior
+    public String[] bonnePratique() {
+        //...
+        return new String[0];
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ReturnFromFinallyBlock"
+          language="java"
+          since="1.05"
+          message="避免在finally块中返回。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#returnfromfinallyblock">
+        <description>
+避免在finally块中返回，这可能会丢弃异常。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>//FinallyClause//ReturnStatement except //FinallyClause//(MethodDeclaration|LambdaExpression)//ReturnStatement</value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Bar {
+    public String foo() {
+        try {
+            throw new Exception( "My Exception" );
+        } catch (Exception e) {
+            throw e;
+        } finally {
+            return "A. O. K."; // return not recommended here
+        }
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="SimpleDateFormatNeedsLocale"
+          language="java"
+          since="2.0"
+          message="当实例化一个SimpleDateFormat对象时，指定一个Locale。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#simpledateformatneedslocale">
+        <description>
+确保在创建SimpleDateFormat实例时指定一个Locale，以使用适当的地区格式化。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ConstructorCall
+    [pmd-java:typeIs('java.text.SimpleDateFormat')]
+    [ArgumentList/@Size = 1]
+]]>
+                    </value>
+                </property>
+            </properties>
+        <example>
+<![CDATA[
+public class Foo {
+  // Should specify Locale.US (or whatever)
+  private SimpleDateFormat sdf = new SimpleDateFormat("pattern");
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="SingleMethodSingleton"
+          language="java"
+          since="5.4"
+          message="类中包含多个getInstance方法。请审查。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.SingleMethodSingletonRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#singlemethodsingleton">
+        <description>
+有些类包含重载的getInstance方法。重载getInstance方法的问题在于，使用重载方法创建的实例不会被缓存，因此，每次调用都会为每次调用创建新对象。
+        </description>
+        <priority>2</priority>
+        <example>
+<![CDATA[
+public class Singleton {
+
+    private static Singleton singleton = new Singleton( );
+
+    private Singleton(){ }
+
+    public static Singleton getInstance( ) {
+        return singleton;
+    }
+
+    public static Singleton getInstance(Object obj){
+        Singleton singleton = (Singleton) obj;
+        return singleton;           //violation
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="SingletonClassReturningNewInstance"
+          language="java"
+          since="5.4"
+          message="getInstance方法总是创建一个新对象，因此不符合单例设计模式的行为。请审查。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.SingletonClassReturningNewInstanceRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#singletonclassreturningnewinstance">
+        <description>
+单例类应该只有一个实例。如果没有检查是否已经创建了实例，可能会导致创建多个实例。
+        </description>
+        <priority>2</priority>
+        <example>
+<![CDATA[
+class Singleton {
+    private static Singleton instance = null;
+    public static Singleton getInstance() {
+        synchronized(Singleton.class) {
+            return new Singleton(); // this should be assigned to the field
+        }
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="StaticEJBFieldShouldBeFinal"
+          language="java"
+          since="4.1"
+          message="EJB（Enterprise JavaBeans）不应该有非final的静态字段。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#staticejbfieldshouldbefinal">
+        <description>
+根据J2EE规范，EJB不应有任何具有写访问权限的静态字段。然而，允许静态只读字段。这确保了当实例由容器在几个JRE上分布式时的正确行为。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ClassDeclaration[ImplementsList/ClassType[
+        pmd-java:typeIs('javax.ejb.SessionBean')
+     or pmd-java:typeIs('javax.ejb.EJBHome')
+     or pmd-java:typeIs('javax.ejb.EJBLocalObject')
+     or pmd-java:typeIs('javax.ejb.EJBLocalHome')
+     or pmd-java:typeIs('javax.ejb.EJBObject')
+    ]]
+    /ClassBody/FieldDeclaration
+        [pmd-java:modifiers() = 'static']
+        [not(pmd-java:modifiers() = 'final')]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class SomeEJB extends EJBObject implements EJBLocalHome {
+
+    private static int CountA;          // poor, field can be edited
+
+    private static final int CountB;    // preferred, read-only access
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="StringBufferInstantiationWithChar"
+          language="java"
+          since="3.9"
+          message="不要使用字符实例化StringBuffer或StringBuilder。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#stringbufferinstantiationwithchar">
+        <description>
+作为初始化参数提供的单个字符值将被转换为整数。这可能导致内部缓冲区大小超出预期。以下是一些示例：
+
+```java
+new StringBuffer()      // 16
+new StringBuffer(6)     // 6
+new StringBuffer("hello world")  // 11 + 16 = 27
+new StringBuffer('A')   // 'A'的ASCII值 = 65
+new StringBuffer("A")   // 1 + 16 = 17
+
+new StringBuilder()     // 16
+new StringBuilder(6)    // 6
+new StringBuilder("hello world")  // 11 + 16 = 27
+new StringBuilder('C')   // 'C'的ASCII值 = 67
+new StringBuilder("A")   // 1 + 16 = 17
+```
+
+在这些示例中，使用字符实例化StringBuffer或StringBuilder时，字符被转换为其ASCII值，这可能导致创建的缓冲区大小不是预期的大小。因此，应避免使用字符来初始化这些对象，而是使用字符串或数字来指定所需的初始容量。
+        </description>
+        <priority>4</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ConstructorCall[ArgumentList/CharLiteral]
+    [pmd-java:typeIs('java.lang.StringBuilder') or pmd-java:typeIs('java.lang.StringBuffer')]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+// misleading instantiation, these buffers
+// are actually sized to 99 characters long
+StringBuffer  sb1 = new StringBuffer('c');
+StringBuilder sb2 = new StringBuilder('c');
+
+// in these forms, just single characters are allocated
+StringBuffer  sb3 = new StringBuffer("c");
+StringBuilder sb4 = new StringBuilder("c");
+]]>
+        </example>
+    </rule>
+
+    <rule name="SuspiciousEqualsMethodName"
+          language="java"
+          since="2.0"
+          message="方法名称和参数数量与equals(Object)非常相似，这令人怀疑。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#suspiciousequalsmethodname">
+        <description>
+方法名称和参数数量与 `Object.equals` 非常接近，这可能表明有重写它的意图。然而，该方法并没有重写 `Object.equals`，而是对其进行了重载。
+重载 `Object.equals` 方法对其他程序员来说可能会造成混淆，容易出错并且难以维护，尤其是在使用继承时，因为子类中使用的 `@Override` 注解可能会给人一种错误的安全感。有关 `Object.equals` 方法的更多信息，请参见《Effective Java, 3rd Edition, Item 10: Obey the general contract when overriding equals》。
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodDeclaration[@Name = 'equals'][
+    (@Arity = 1
+     and not(FormalParameters/FormalParameter[pmd-java:typeIsExactly('java.lang.Object')])
+     or not(PrimitiveType[@Kind = 'boolean'])
+    ) or (
+     @Arity = 2
+     and PrimitiveType[@Kind = 'boolean']
+     and FormalParameters/FormalParameter[pmd-java:typeIsExactly('java.lang.Object')]
+     and not(pmd-java:hasAnnotation('java.lang.Override'))
+    )
+]
+| //MethodDeclaration[@Name = 'equal'][
+    @Arity = 1
+    and FormalParameters/FormalParameter[pmd-java:typeIsExactly('java.lang.Object')]
+]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+   public int equals(Object o) {
+     // oops, this probably was supposed to be boolean equals
+   }
+   public boolean equals(String s) {
+     // oops, this probably was supposed to be equals(Object)
+   }
+   public boolean equals(Object o1, Object o2) {
+     // oops, this probably was supposed to be equals(Object)
+   }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="SuspiciousHashcodeMethodName"
+          language="java"
+          since="1.5"
+          message="方法名称和返回类型与hashCode()非常相似，这可能意味着它被设计为重写hashCode()方法。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#suspicioushashcodemethodname">
+        <description>
+方法名称和返回类型与hashCode()非常相似，这可能表明有重写hashCode()方法的意图。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+//MethodDeclaration[
+        lower-case(@Name) = 'hashcode'
+    and @Name != 'hashCode'
+    and @Arity = 0
+    and PrimitiveType[@Kind = 'int']
+]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+    public int hashcode() { // oops, this probably was supposed to be 'hashCode'
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="SuspiciousOctalEscape"
+          language="java"
+          since="1.5"
+          message="字符串字面量中的可疑十进制字符，跟随在八进制转义之后：{0}。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.SuspiciousOctalEscapeRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#suspiciousoctalescape">
+        <description>
+在字符串字面量中发现了一个可疑的八进制转义序列。
+Java语言规范（第3.10.6节）指出，字符串字面量中的八进制转义序列应由反斜杠后跟：
+
+    OctalDigit | OctalDigit OctalDigit | ZeroToThree OctalDigit OctalDigit
+
+任何八进制转义序列后跟非八进制数字都可能令人困惑，例如"\038"被解释为八进制转义序列"\03"后跟文字字符"8"。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public void foo() {
+  // interpreted as octal 12, followed by character '8'
+  System.out.println("suspicious: \128");
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="TestClassWithoutTestCases"
+          language="java"
+          since="3.0"
+          message="类''{0}''可能是一个测试类，但它不包含任何测试用例。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.TestClassWithoutTestCasesRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#testclasswithouttestcases">
+        <description>
+测试类通常以"Test"、"Tests"或"TestCase"作为后缀。拥有一个非测试类以这样的名称命名不是一个好的实践，因为大多数人会假设它是一个测试用例。测试类有以"testXXX"命名的测试方法（JUnit3）或使用注解（例如`@Test`）。
+
+可以使用属性`testClassPattern`来配置后缀。要通过名称禁用对可能的测试类的检测，请将此属性设置为空字符串。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+//Consider changing the name of the class if it is not a test
+//Consider adding test methods if it is a test
+public class CarTest {
+   public static void main(String[] args) {
+    // do something
+   }
+   // code
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UnconditionalIfStatement"
+          language="java"
+          since="1.5"
+          message="不要使用总是真或总是假的'if'语句。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#unconditionalifstatement">
+        <description>
+不要使用条件总是为真或总是为假的"if"语句。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+ <![CDATA[
+//IfStatement[BooleanLiteral[1]]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+    public void close() {
+        if (true) {        // fixed conditional, not recommended
+            // ...
+        }
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UnnecessaryBooleanAssertion"
+          language="java"
+          since="3.0"
+          message="assertTrue(true)或类似的语句是不必要的。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#unnecessarybooleanassertion">
+        <description>
+JUnit测试断言中的布尔字面量是不必要的，因为它总是评估为相同的结果。考虑使用流程控制（在`assertTrue(false)`或类似的情况下）或者简单地移除像`assertTrue(true)`和`assertFalse(false)`这样的语句。如果你只是想在发现错误后让测试停止，使用`fail()`方法并提供为什么这样做的指示消息。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ClassDeclaration
+    [pmd-java:typeIs('junit.framework.TestCase')
+     or .//Annotation[pmd-java:typeIs('org.junit.Test')
+                   or pmd-java:typeIs('org.junit.jupiter.api.Test')
+                   or pmd-java:typeIs('org.junit.jupiter.api.RepeatedTest')
+                   or pmd-java:typeIs('org.junit.jupiter.api.TestFactory')
+                   or pmd-java:typeIs('org.junit.jupiter.api.TestTemplate')
+                   or pmd-java:typeIs('org.junit.jupiter.params.ParameterizedTest')
+     ]
+    ]
+    //MethodCall[@MethodName = ('assertTrue', 'assertFalse')]
+        [ArgumentList
+            [
+                BooleanLiteral or
+                UnaryExpression[@Operator = '!'][BooleanLiteral]
+            ]
+        ]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class SimpleTest extends TestCase {
+    public void testX() {
+        assertTrue(true);            // serves no real purpose - remove it
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UnnecessaryCaseChange"
+          language="java"
+          since="3.3"
+          message="使用equalsIgnoreCase()比使用toUpperCase/toLowerCase().equals()更清晰。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.UnnecessaryCaseChangeRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#unnecessarycasechange">
+        <description>
+使用equalsIgnoreCase()比使用toUpperCase/toLowerCase().equals()更清晰。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+boolean answer1 = buz.toUpperCase().equals("BAZ");              // should be buz.equalsIgnoreCase("BAZ")
+
+boolean answer2 = buz.toUpperCase().equalsIgnoreCase("BAZ");    // another unnecessary toUpperCase()
+]]>
+        </example>
+    </rule>
+
+    <rule name="UnnecessaryConversionTemporary"
+          language="java"
+          since="0.1"
+          message="在将基本类型转换为字符串时，避免不必要的临时变量。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#unnecessaryconversiontemporary">
+        <description>
+避免在将基本类型转换为字符串时使用临时对象。改用包装类的静态转换方法。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodCall[@MethodName = 'toString']
+    [ConstructorCall[position() = 1]
+        [
+            pmd-java:typeIs('java.lang.Integer')
+         or pmd-java:typeIs('java.lang.Long')
+         or pmd-java:typeIs('java.lang.Float')
+         or pmd-java:typeIs('java.lang.Byte')
+         or pmd-java:typeIs('java.lang.Double')
+         or pmd-java:typeIs('java.lang.Short')
+        ]
+    ]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public String convert(int x) {
+    String foo = new Integer(x).toString(); // this wastes an object
+
+    return Integer.toString(x);             // preferred approach
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UnusedNullCheckInEquals"
+          language="java"
+          since="3.5"
+          message="在你已经确保对象不为null之后，调用该对象的equals()方法。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#unusednullcheckinequals">
+        <description>
+在检查了一个对象引用是否为null之后，你应该在这个对象上调用equals()方法，而不是将它传递给另一个对象的equals()方法。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//InfixExpression[@Operator = '&&']
+  /MethodCall[pmd-java:matchesSig("java.lang.Object#equals(java.lang.Object)")]
+             [not(StringLiteral)]
+             [not(VariableAccess[@CompileTimeConstant = true()])]
+             [ArgumentList/VariableAccess/@Name = ..//InfixExpression[@Operator = '!='][NullLiteral]/VariableAccess/@Name]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Test {
+
+    public String method1() { return "ok";}
+    public String method2() { return null;}
+
+    public void method(String a) {
+        String b;
+        // I don't know it method1() can be "null"
+        // but I know "a" is not null..
+        // I'd better write a.equals(method1())
+
+        if (a!=null && method1().equals(a)) { // will trigger the rule
+            //whatever
+        }
+
+        if (method1().equals(a) && a != null) { // won't trigger the rule
+            //whatever
+        }
+
+        if (a!=null && method1().equals(b)) { // won't trigger the rule
+            //whatever
+        }
+
+        if (a!=null && "LITERAL".equals(a)) { // won't trigger the rule
+            //whatever
+        }
+
+        if (a!=null && !a.equals("go")) { // won't trigger the rule
+            a=method2();
+            if (method1().equals(a)) {
+                //whatever
+            }
+        }
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UseCorrectExceptionLogging"
+          language="java"
+          since="3.2"
+          message="使用正确的日志语句来记录异常。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#usecorrectexceptionlogging">
+        <description>
+为确保完整堆栈跟踪被打印出来，请使用带有两个参数的日志语句：一个字符串和一个Throwable。
+
+此规则仅适用于[Apache Commons Logging](https://commons.apache.org/proper/commons-logging/)。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//CatchClause/Block//MethodCall
+    [pmd-java:matchesSig('org.apache.commons.logging.Log#_(java.lang.Object)')]
+    [ArgumentList[not(MethodCall)]//VariableAccess/@Name = ancestor::CatchClause/CatchParameter/@Name]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Main {
+    private static final Log _LOG = LogFactory.getLog( Main.class );
+    void bar() {
+        try {
+        } catch( Exception e ) {
+            _LOG.error( e ); //Wrong!
+        } catch( OtherException oe ) {
+            _LOG.error( oe.getMessage(), oe ); //Correct
+        }
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UseEqualsToCompareStrings"
+          language="java"
+          since="4.1"
+          message="使用equals()来比较字符串，而不是''==''或''!=''。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#useequalstocomparestrings">
+        <description>
+使用''==''或''!=''来比较字符串只有在使用interned字符串（`String#intern()`）时才是可靠的。
+
+请改用`equals()`方法。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//InfixExpression[@Operator = ('==', '!=')]
+                 [count(*[pmd-java:typeIsExactly('java.lang.String')]) = 2]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public boolean test(String s) {
+    if (s == "one") return true;        // unreliable
+    if ("two".equals(s)) return true;   // better
+    return false;
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UselessOperationOnImmutable"
+          language="java"
+          since="3.5"
+          message="对不可变对象（String、BigDecimal或BigInteger）的操作不会改变对象本身。"
+          class="net.sourceforge.pmd.lang.java.rule.errorprone.UselessOperationOnImmutableRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#uselessoperationonimmutable">
+        <description>
+由于操作的结果是一个新的对象，所以对不可变对象（String、BigDecimal或BigInteger）的操作不会改变对象本身。因此，忽略操作结果是不正确的。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+import java.math.*;
+
+class Test {
+    void method1() {
+        BigDecimal bd=new BigDecimal(10);
+        bd.add(new BigDecimal(5));      // this will trigger the rule
+    }
+    void method2() {
+        BigDecimal bd=new BigDecimal(10);
+        bd = bd.add(new BigDecimal(5)); // this won't trigger the rule
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UseLocaleWithCaseConversions"
+          language="java"
+          since="2.0"
+          message="在执行String.toLowerCase()/toUpperCase()调用时，使用一个Locale。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#uselocalewithcaseconversions">
+        <description>
+在进行`String::toLowerCase()`/`toUpperCase()`转换时，使用显式的locale参数来指定大小写转换规则。
+
+不带参数使用`String::toLowerCase()`隐式地使用`Locale::getDefault()`。
+问题是默认locale依赖于当前JVM的设置（通常取决于它运行的系统）。使用系统默认locale可能正是你想要的（例如，如果你通过标准输入操作字符串），但也可能不是（例如，如果你是通过网络或文件获取字符串，并且编码是明确定义的，与环境无关）。在后一种情况下，使用默认locale会使大小写转换变得脆弱，因为它可能会在具有其他大小写转换规则的机器上产生意想不到的结果。例如，在土耳其语中，`i`的大写形式是`İ`（U+0130，不是ASCII），而不是英语中的`I`（U+0049）。
+
+这条规则旨在*强制*开发者在处理字符串时考虑locale。通过在编写时有意识地决定locale的选择，你减少了将来出现意外行为的风险，并向未来的读者传达了你的意图。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodCall[pmd-java:matchesSig("java.lang.String#toLowerCase()") or pmd-java:matchesSig("java.lang.String#toUpperCase()")]
+            [not(MethodCall[@MethodName = "toHexString"])]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+// violation - implicitly system-dependent conversion
+if (x.toLowerCase().equals("list")) {}
+
+// The above will not match "LIST" on a system with a Turkish locale.
+// It could be replaced with
+if (x.toLowerCase(Locale.US).equals("list")) { }
+// or simply
+if (x.equalsIgnoreCase("list")) { }
+
+// ok - system independent conversion
+String z = a.toLowerCase(Locale.ROOT);
+
+// ok - explicit system-dependent conversion
+String z2 = a.toLowerCase(Locale.getDefault());
+]]>
+        </example>
+    </rule>
+
+    <rule name="UseProperClassLoader"
+          language="java"
+          since="3.7"
+          message="在J2EE中，getClassLoader()可能不会按预期工作。改用Thread.currentThread().getContextClassLoader()。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_errorprone.html#useproperclassloader">
+        <description>
+在J2EE中，getClassLoader()方法可能不会按预期工作。改用Thread.currentThread().getContextClassLoader()。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>//MethodCall[pmd-java:matchesSig("java.lang.Class#getClassLoader()")]</value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+    ClassLoader cl = Bar.class.getClassLoader();
+}
+]]>
+        </example>
+    </rule>
+
+</ruleset>

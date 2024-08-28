@@ -1,0 +1,1418 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<ruleset name="Design"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+        帮助你发现设计问题的规则。
+    </description>
+
+    <rule name="AbstractClassWithoutAnyMethod"
+          language="java"
+          since="4.2"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          message="没有抽象方法，这意味着关键字很可能是为了防止实例化。改用私有或受保护的构造函数。"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#abstractclasswithoutanymethod">
+        <description>
+            如果一个抽象类没有提供任何方法，它可能只是一个简单的数据容器，并且不打算被实例化。在这种情况下，使用私有或受保护的构造函数来防止实例化，比将类误导性地声明为抽象类更好。
+        </description>
+        <priority>1</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+//ClassDeclaration
+    [@Abstract = true() and @Interface = false()]
+    [ClassBody[not(ConstructorDeclaration | MethodDeclaration)]]
+    [not(pmd-java:hasAnnotation('com.google.auto.value.AutoValue')
+         or pmd-java:hasAnnotation('lombok.AllArgsConstructor')
+         or pmd-java:hasAnnotation('lombok.NoArgsConstructor')
+         or pmd-java:hasAnnotation('lombok.RequiredArgsConstructor'))
+    ]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+public abstract class Example {
+    String field;
+    int otherField;
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidCatchingGenericException"
+          since="4.2.6"
+          language="java"
+          message="避免在 `try-catch` 块中捕获通用的异常，例如 `NullPointerException`、`RuntimeException` 或 `Exception`。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#avoidcatchinggenericexception">
+        <description>
+            避免在 `try-catch` 块中捕获通用的异常，例如 `NullPointerException`、`RuntimeException` 或 `Exception`。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+//CatchParameter//ClassType[
+        pmd-java:typeIsExactly('java.lang.NullPointerException') or
+        pmd-java:typeIsExactly('java.lang.Exception') or
+        pmd-java:typeIsExactly('java.lang.RuntimeException')]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+package com.igate.primitive;
+
+public class PrimitiveType {
+
+    public void downCastPrimitiveType() {
+        try {
+            System.out.println(" i [" + i + "]");
+        } catch(Exception e) {
+            e.printStackTrace();
+        } catch(RuntimeException e) {
+            e.printStackTrace();
+        } catch(NullPointerException e) {
+            e.printStackTrace();
+        }
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidDeeplyNestedIfStmts"
+          language="java"
+          since="1.0"
+          message="深度嵌套的 `if..then` 语句很难阅读。"
+          class="net.sourceforge.pmd.lang.java.rule.design.AvoidDeeplyNestedIfStmtsRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#avoiddeeplynestedifstmts">
+        <description>
+            避免创建深度嵌套的 `if-then` 语句，因为它们更难阅读，并且维护起来容易出错。
+        </description>
+        <priority>3</priority>
+        <example>
+            <![CDATA[
+public class Foo {
+  public void bar(int x, int y, int z) {
+    if (x>y) {
+      if (y>z) {
+        if (z==x) {
+         // !! too deep
+        }
+      }
+    }
+  }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidRethrowingException"
+          language="java"
+          since="3.8"
+          message="应该避免仅仅捕获异常然后重新抛出的 `catch` 语句。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#avoidrethrowingexception">
+        <description>
+            仅仅重新抛出捕获异常的 `catch` 块只会增加代码的大小和运行时复杂性。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+//CatchClause[
+  CatchParameter/VariableId/@Name
+= Block[@Size = 1]/ThrowStatement/VariableAccess/@Name]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+public void bar() {
+    try {
+        // do something
+    }  catch (SomeException se) {
+       throw se;
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidThrowingNewInstanceOfSameException"
+          since="4.2.5"
+          language="java"
+          message="仅仅捕获一个异常并将其包装在同类型的异常的新实例中再抛出的 `catch` 块应该避免使用。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#avoidthrowingnewinstanceofsameexception">
+        <description>
+            仅仅将捕获的异常包装在同类型的异常的新实例中并重新抛出的 `catch` 块只会增加代码的大小和运行时的复杂性。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+//CatchClause
+    [count(Block/*) = 1]
+    [CatchParameter/ClassType/@SimpleName = Block/ThrowStatement/ConstructorCall/ClassType/@SimpleName]
+    [Block/ThrowStatement/ConstructorCall/ArgumentList/@Size = 1]
+    /Block/ThrowStatement/ConstructorCall
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+public void bar() {
+    try {
+        // do something
+    } catch (SomeException se) {
+        // harmless comment
+        throw new SomeException(se);
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidThrowingNullPointerException"
+          language="java"
+          since="1.8"
+          message="避免抛出空指针异常。"
+          class="net.sourceforge.pmd.lang.java.rule.design.AvoidThrowingNullPointerExceptionRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#avoidthrowingnullpointerexception">
+        <description>
+            <![CDATA[
+避免手动抛出空指针异常。这些异常容易让人误以为是虚拟机抛出的。为了防止方法被传入空参数，可以考虑使用 `IllegalArgumentException`，这样可以清楚地表明这是程序员主动引发的异常。然而，还有更好的处理方式：
+
+>*《Effective Java》第三版，第72条：优先使用标准异常*
+
+>可以说，每次错误的调用都归结为非法参数或状态，但对于某些非法参数和状态，通常会使用其他标准异常。如果调用者传递了不允许为 `null` 的参数，按照惯例应抛出 `NullPointerException`，而不是 `IllegalArgumentException`。
+
+为了实现这一点，建议使用 `java.util.Objects.requireNonNull()`（自 Java 1.7 引入）。该方法主要用于对方法和构造函数中的多个参数进行验证。
+
+你的参数验证代码可以如下：
+```java
+public class Foo {
+    private String exampleValue;
+
+    void setExampleValue(String exampleValue) {
+      // 在一个标准调用中完成检查、抛出异常和赋值
+      this.exampleValue = Objects.requireNonNull(exampleValue, "exampleValue must not be null!");
+    }
+}
+```
+]]>
+        </description>
+        <priority>1</priority>
+        <example>
+            <![CDATA[
+public class Foo {
+    void bar() {
+        throw new NullPointerException();
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidThrowingRawExceptionTypes"
+          language="java"
+          since="1.8"
+          message="避免抛出原始异常类型。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#avoidthrowingrawexceptiontypes">
+        <description>
+            避免抛出某些异常类型。与其抛出原始的 `RuntimeException`、`Throwable`、`Exception` 或 `Error`，不如抛出一个具体的子类异常或错误。
+        </description>
+        <priority>1</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+//ThrowStatement//ConstructorCall
+ /ClassType[
+ pmd-java:typeIsExactly('java.lang.Throwable')
+or
+ pmd-java:typeIsExactly('java.lang.Exception')
+or
+ pmd-java:typeIsExactly('java.lang.Error')
+or
+ pmd-java:typeIsExactly('java.lang.RuntimeException')
+]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+public class Foo {
+    public void bar() throws Exception {
+        throw new Exception();
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidUncheckedExceptionsInSignatures"
+          since="6.13.0"
+          language="java"
+          message="方法或构造函数不应在其 `throws` 子句中显式声明未检查异常。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#avoiduncheckedexceptionsinsignatures">
+        <description>
+            报告方法或构造函数的 `throws` 子句中的未检查异常。Java 不强制调用者处理未检查异常，因此除了文档记录之外，这种声明是不必要的。更好的做法是使用 `@throws` Javadoc 标签来记录异常情况，这样可以提供更详细的描述。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+//ThrowsList/ClassType[pmd-java:typeIs('java.lang.RuntimeException')]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+public void foo() throws RuntimeException {
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ClassWithOnlyPrivateConstructorsShouldBeFinal"
+          language="java"
+          since="4.1"
+          class="net.sourceforge.pmd.lang.java.rule.design.ClassWithOnlyPrivateConstructorsShouldBeFinalRule"
+          message="这个类只有私有构造函数，可以将其声明为 `final`。"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#classwithonlyprivateconstructorsshouldbefinal">
+        <description>
+            报告那些可以声明为 `final` 的类，因为它们的所有构造函数都是私有的，外部的子类无法调用父类的构造函数，因此无法继承这些类。
+        </description>
+        <priority>1</priority>
+        <example>
+            <![CDATA[
+public class Foo {  //Should be final
+    private Foo() { }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="CollapsibleIfStatements"
+          language="java"
+          since="3.1"
+          message="这个 `if` 语句可以与其父语句合并。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#collapsibleifstatements">
+        <description><![CDATA[
+报告可以通过在它们之间使用布尔 `&&` 运算符将条件合并在一起的嵌套 `if` 语句。
+        ]]></description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+//IfStatement[@Else = false()]/IfStatement[@Else = false()]
+|
+//IfStatement[@Else = false()]/Block[count(*) = 1]/IfStatement[@Else = false()]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+class Foo {
+
+    void bar() {
+        if (x) {            // original implementation
+            if (y) {
+                // do stuff
+            }
+        }
+    }
+
+    void bar() {
+        if (x && y) {        // clearer implementation
+            // do stuff
+        }
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="CouplingBetweenObjects"
+          language="java"
+          since="1.04"
+          message="成员变量中不同对象的数量过多表明了较高的耦合度。"
+          class="net.sourceforge.pmd.lang.java.rule.design.CouplingBetweenObjectsRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#couplingbetweenobjects">
+        <description>
+            此规则统计对象中的唯一属性、局部变量和返回类型的数量。数量高于指定阈值可能表明耦合度较高。
+        </description>
+        <priority>3</priority>
+        <example>
+            <![CDATA[
+import com.Blah;
+import org.Bar;
+import org.Bardo;
+
+public class Foo {
+    private Blah var1;
+    private Bar var2;
+
+    //followed by many imports of unique objects
+    ObjectC doWork() {
+        Bardo var55;
+        ObjectA var44;
+        ObjectZ var93;
+        return something();
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="CognitiveComplexity"
+          language="java"
+          message="{0} ''{1}'' 的认知复杂度为 {2}，当前阈值为 {3}"
+          since="6.35.0"
+          class="net.sourceforge.pmd.lang.java.rule.design.CognitiveComplexityRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#cognitivecomplexity">
+        <description><![CDATA[
+方法的复杂度高，难以阅读和维护。如果在单个方法中包含过多的决策逻辑，会使其行为难以理解，并且更难以修改。
+
+认知复杂度是衡量人类阅读和理解方法难度的指标。控制流中的中断会增加复杂度，而语言简写的使用不会增加复杂度。嵌套的控制流会使方法更难理解，每增加一个嵌套层级，认知复杂度就会增加。
+
+有关认知复杂度的信息可以在原始论文中找到：
+<https://www.sonarsource.com/docs/CognitiveComplexity.pdf>
+
+默认情况下，该规则报告复杂度为 15 或以上的方法。报告的方法应被拆分成更简单的组件。
+        ]]></description>
+        <priority>3</priority>
+        <example>
+            <![CDATA[
+public class Foo {
+  // Has a cognitive complexity of 0
+  public void createAccount() {
+    Account account = new Account("PMD");
+    // save account
+  }
+
+  // Has a cognitive complexity of 1
+  public Boolean setPhoneNumberIfNotExisting(Account a, String phone) {
+    if (a.phone == null) {                          // +1
+      a.phone = phone;
+      return true;
+    }
+
+    return false;
+  }
+
+  // Has a cognitive complexity of 4
+  public void updateContacts(List<Contact> contacts) {
+    List<Contact> contactsToUpdate = new ArrayList<Contact>();
+
+    for (Contact contact : contacts) {                           // +1
+      if (contact.department.equals("Finance")) {                // +2 (nesting = 1)
+        contact.title = "Finance Specialist";
+        contactsToUpdate.add(contact);
+      } else if (contact.department.equals("Sales")) {           // +1
+        contact.title = "Sales Specialist";
+        contactsToUpdate.add(contact);
+      }
+    }
+    // save contacts
+  }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="CyclomaticComplexity"
+          language="java"
+          message="{0} ''{1}'' 的圈复杂度为 {3}，{2}"
+          since="1.03"
+          class="net.sourceforge.pmd.lang.java.rule.design.CyclomaticComplexityRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#cyclomaticcomplexity">
+        <description><![CDATA[
+方法的复杂性直接影响维护成本和可读性。将过多的决策逻辑集中在一个方法中，会使其行为难以阅读和更改。
+
+圈复杂度通过计算方法中的决策点数量来评估方法的复杂性，每个方法还会加上一个入口点。决策点是控制流跳转到程序其他地方的地方。因此，它们包括所有控制流语句，如 `if`、`while`、`for` 和 `case`。有关计算的更多细节，请参见文档 {% jdoc java::lang.java.metrics.JavaMetrics#CYCLO %}。
+
+通常，1-4 之间的数字表示低复杂度，5-7 表示中等复杂度，8-10 表示高复杂度，11+ 表示非常高的复杂度。默认情况下，此规则会报告复杂度 >= 10 的方法。此外，方法复杂度总和达到 80 的类也会被报告，即使这些方法没有直接被报告。
+
+报告的方法应该被拆分成几个较小的方法。报告的类可能需要拆分成子组件。
+]]>
+        </description>
+        <priority>3</priority>
+        <example>
+            <![CDATA[
+class Foo {
+  void baseCyclo() {                // Cyclo = 1
+    highCyclo();
+  }
+
+  void highCyclo() {                // Cyclo = 10: reported!
+    int x = 0, y = 2;
+    boolean a = false, b = true;
+
+    if (a && (y == 1 ? b : true)) { // +3
+      if (y == x) {                 // +1
+        while (true) {              // +1
+          if (x++ < 20) {           // +1
+            break;                  // +1
+          }
+        }
+      } else if (y == t && !d) {    // +2
+        x = a ? y : x;              // +1
+      } else {
+        x = 2;
+      }
+    }
+  }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="DataClass"
+          language="java"
+          since="6.0.0"
+          message="类 ''{0}'' 被怀疑是一个数据类 (WOC={1}, NOPA={2}, NOAM={3}, WMC={4})"
+          class="net.sourceforge.pmd.lang.java.rule.design.DataClassRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#dataclass">
+        <description>
+            数据类是简单的数据容器，通常暴露了大部分状态，并且没有复杂的功能。功能的缺乏可能表明它们的行为在其他地方定义，这是数据与行为分离的一个标志。通过直接暴露内部实现，数据类破坏了封装性，从而降低了系统的可维护性和可理解性。此外，这些类通常过于依赖其数据表示，导致设计脆弱。
+
+            重构数据类应侧重于恢复良好的数据与行为的接近性。在大多数情况下，这意味着将对数据定义的操作移动回类内部。在某些情况下，完全移除该类并将数据移动到以前的客户端类中可能更为合理。
+
+            该规则使用指标来实现其检测策略。违反消息提供了这些指标的值的信息：
+            * WMC：类复杂度度量，参见 {% jdoc java::lang.java.metrics.JavaMetrics#WEIGHED_METHOD_COUNT %}
+            * WOC：类的“非平凡性”度量，参见 {% jdoc java::lang.java.metrics.JavaMetrics#WEIGHT_OF_CLASS %}
+            * NOPA：公共属性的数量，参见 {% jdoc java::lang.java.metrics.JavaMetrics#NUMBER_OF_PUBLIC_FIELDS %}
+            * NOAM：公共访问器方法的数量，参见 {% jdoc java::lang.java.metrics.JavaMetrics#NUMBER_OF_ACCESSORS %}
+
+            该规则通过查找具有以下所有属性的类来识别数据类：
+            * 高 NOPA 和 NOAM
+            * 低 WOC
+            * 低 WMC
+        </description>
+        <priority>3</priority>
+        <example>
+            <![CDATA[
+public class DataClass {
+
+  // class exposes public attributes
+  public String name = "";
+  public int bar = 0;
+  public int na = 0;
+
+  private int bee = 0;
+
+  // and private ones through getters
+  public void setBee(int n) {
+    bee = n;
+  }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="DoNotExtendJavaLangError"
+          language="java"
+          since="4.0"
+          message="异常不应该继承java.lang.Error"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#donotextendjavalangerror">
+        <description>
+            错误是系统异常，不要继承它们。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+//ClassDeclaration/ExtendsList/ClassType[pmd-java:typeIs('java.lang.Error')]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+public class Foo extends Error { }
+]]>
+        </example>
+    </rule>
+
+    <rule name="ExceptionAsFlowControl"
+          language="java"
+          since="1.8"
+          message="在这一块代码中，抛出的异常在第 {0} 行被捕获。"
+          class="net.sourceforge.pmd.lang.java.rule.design.ExceptionAsFlowControlRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#exceptionasflowcontrol">
+        <description>
+            此规则报告在封闭的 try 语句中抛出的异常和捕获的异常。将异常用作 `goto` 语句的形式是不被鼓励的，因为这可能会隐藏实际的异常，并且使控制流变得模糊，尤其是在调试时。要修复此违规行为，请添加必要的验证或使用替代的控制结构。
+        </description>
+        <priority>3</priority>
+        <example>
+            <![CDATA[
+public void bar() {
+    try {
+        try {
+        } catch (Exception e) {
+            throw new WrapperException(e);
+            // this is essentially a GOTO to the WrapperException catch block
+        }
+    } catch (WrapperException e) {
+        // do some more stuff
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ExcessiveImports"
+          language="java"
+          since="1.04"
+          message="大量的导入可能表示对象之间的高度耦合。"
+          class="net.sourceforge.pmd.lang.java.rule.design.ExcessiveImportsRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#excessiveimports">
+        <description>
+            此规则统计唯一导入的数量，并在数量超过用户指定的阈值时报告违规。
+        </description>
+        <priority>3</priority>
+        <example>
+            <![CDATA[
+import blah.blah.Baz;
+import blah.blah.Bif;
+// 28 others from the same package elided
+public class Foo {
+    public void doWork() {}
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ExcessiveParameterList"
+          language="java"
+          since="0.9"
+          message=""
+          class="net.sourceforge.pmd.lang.java.rule.design.ExcessiveParameterListRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#excessiveparameterlist">
+        <description>
+            避免使用长参数列表。具有众多参数的方法在维护上是一个挑战，特别是如果它们中的大多数共享相同的数据类型。这些情况通常表明需要创建新对象来封装众多的参数。
+        </description>
+        <priority>3</priority>
+        <example>
+            <![CDATA[
+public void addPerson(      // too many arguments liable to be mixed up
+    int birthYear, int birthMonth, int birthDate, int height, int weight, int ssn) {
+
+    . . . .
+}
+
+public void addPerson(      // preferred approach
+    Date birthdate, BodyMeasurements measurements, int ssn) {
+
+    . . . .
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ExcessivePublicCount"
+          language="java"
+          since="1.04"
+          message="这个类拥有过多公共方法和属性。"
+          class="net.sourceforge.pmd.lang.java.rule.design.ExcessivePublicCountRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#excessivepubliccount">
+        <description>
+            具有大量公共方法和属性的类需要不成比例的测试工作量，因为组合副作用迅速增长并增加了风险。将这些类重构为更小的类不仅可以提高可测试性和可靠性，还允许容易地开发新变体。
+        </description>
+        <priority>3</priority>
+        <example>
+            <![CDATA[
+public class Foo {
+    public String value;
+    public Bar something;
+    public Variable var;
+    // [... more more public attributes ...]
+
+    public void doWork() {}
+    public void doMoreWork() {}
+    public void doWorkAgain() {}
+    // [... more more public methods ...]
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="FinalFieldCouldBeStatic"
+          language="java"
+          since="1.1"
+          message="这个final字段可以设为静态。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#finalfieldcouldbestatic">
+        <description>
+            如果一个final字段被赋值为编译时常量，它可以被设为静态，从而在运行时每个对象中节省开销。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+//FieldDeclaration
+    [pmd-java:modifiers() = 'final']
+    [not(pmd-java:modifiers() = 'static')]
+    [not(./ancestor::ClassDeclaration[1][pmd-java:hasAnnotation('lombok.experimental.UtilityClass')])]
+    [not(.//Annotation[pmd-java:typeIs('lombok.Builder.Default')])]
+    /VariableDeclarator[*[last()][@CompileTimeConstant = true()
+         or self::NullLiteral
+         or self::VariableAccess[@Name = //FieldDeclaration[pmd-java:modifiers() = 'static']/VariableDeclarator/VariableId/@Name]
+         or self::FieldAccess
+         or self::ArrayAllocation/ArrayType/ArrayDimensions/ArrayDimExpr/NumericLiteral[@IntLiteral = true()][@Image = "0"]]]
+    /VariableId
+        [not(@Name = //MethodDeclaration[not(pmd-java:modifiers() = 'static')]
+            //SynchronizedStatement/(VariableAccess|FieldAccess[ThisExpression])/@Name)]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+public class Foo {
+  public final int BAR = 42; // this could be static and save some space
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="GodClass"
+          language="java"
+          since="5.0"
+          message="可能的God Class（WMC=0，ATFD=2，TCC=1）。"
+          class="net.sourceforge.pmd.lang.java.rule.design.GodClassRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#godclass">
+        <description>
+            God Class 规则使用度量标准来检测God Class设计缺陷。God Classes做太多事情，体积很大且过于复杂。它们应该被拆分，以更符合面向对象的设计。
+            该规则使用《面向对象度量实践》中描述的检测策略。
+            违规情况是针对整个类报告的。
+
+            该规则使用度量标准来实现其检测策略。违规消息提供了这些度量值的信息：
+            * WMC：类复杂度度量标准，参见 {% jdoc java::lang.java.metrics.JavaMetrics#WEIGHED_METHOD_COUNT %}
+            * ATFD：类使用外部数据的度量标准，参见 {% jdoc java::lang.java.metrics.JavaMetrics#ACCESS_TO_FOREIGN_DATA %}
+            * TCC：方法紧密度的度量标准，参见 {% jdoc java::lang.java.metrics.JavaMetrics#TIGHT_CLASS_COHESION %}
+
+            该规则通过寻找具有以下所有属性的类来识别God Class：
+            * 高WMC
+            * 高ATFD
+            * 低TCC
+
+            参见参考资料：
+
+            Michele Lanza 和 Radu Marinescu. *Object-Oriented Metrics in Practice: Using Software Metrics to Characterize, Evaluate, and Improve the Design of Object-Oriented Systems.* Springer, Berlin, 1 edition, October 2006. Page 80.
+        </description>
+        <priority>3</priority>
+    </rule>
+
+    <rule name="ImmutableField"
+          language="java"
+          since="2.0"
+          message="字段''{0}''可以被声明为final。"
+          class="net.sourceforge.pmd.lang.java.rule.design.ImmutableFieldRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#immutablefield">
+        <description>
+            报告在对象初始化结束后其值从未改变的非final字段，并因此可以将其标记为final。
+
+            请注意，此规则并不强制字段值本身必须是不可变的。
+            即使所有成员字段都声明为final，对象仍然可以有可变状态。
+            这被称为浅层不可变性。有关可变性的更多信息，请参见《Effective Java, 3rd Edition, Item 17: Minimize mutability》。
+
+            限制：目前我们只能检查私有字段。
+        </description>
+        <priority>3</priority>
+        <example>
+            <![CDATA[
+public class Foo {
+  private int x; // could be final
+  public Foo() {
+      x = 7;
+  }
+  public void foo() {
+     int a = x + 2;
+  }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="InvalidJavaBean"
+          language="java"
+          since="6.52.0"
+          message="''{0}''缺少属性''{1}''的getter方法。"
+    class="net.sourceforge.pmd.lang.java.rule.design.InvalidJavaBeanRule"
+    externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#invalidjavabean">
+    <description>
+        识别不遵循 [JavaBeans API 规范](https://download.oracle.com/otndocs/jcp/7224-javabeans-1.01-fr-spec-oth-JSpec/) 的 bean。
+
+        每个非静态字段应有 getter 和 setter 方法。如果字段仅用于内部，并不是 bean 属性，则该字段应标记为 `transient`。
+
+        该规则验证字段的类型与 getter 的返回类型相同，并且这个类型与 setter 使用的类型匹配。
+
+        该规则还检查是否有无参或默认构造函数可用。
+
+        可选地，该规则还验证 bean 是否实现了 `java.io.Serializable`。虽然这是原始 JavaBeans 规范的要求，但现代框架不再严格要求此条件。
+
+        为了避免在非 bean 类中出现大量误报，必须通过配置属性 `packages` 显式启用该规则。
+    </description>
+    <priority>3</priority>
+    <example>
+        <![CDATA[
+package org.example.beans;
+public class MyBean {        // <-- bean is not serializable, missing "implements Serializable"
+    private String label;    // <-- missing setter for property "label"
+
+    public String getLabel() {
+        return label;
+    }
+}
+]]>
+    </example>
+</rule>
+
+<rule name="LawOfDemeter"
+      language="java"
+      since="5.0"
+      message="可能违反了Demeter法则 ({0})"
+      class="net.sourceforge.pmd.lang.java.rule.design.LawOfDemeterRule"
+      externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#lawofdemeter">
+<description>
+    迪米特法则是一个简单的规则，指的是“只与朋友交谈”。它禁止从“过远的地方”获取数据，以减少类或对象之间的耦合，尤其是在不同抽象级别之间。
+
+    该规则使用了“度”的概念，用于量化对象的“远近”程度。度数过高的表达式只能以某些方式使用。表达式的度数定义如下：
+    - `this` 的度数为 0
+    - 方法参数的度数为 1
+    - 在方法中创建的新对象的度数为 1
+    - 静态变量的度数为 1
+    - 类似 `expr.field` 的字段访问表达式的度数为 `expr` 的度数加 1
+    - 类似 `expr.getFoo()` 的“getter 表达式”的度数为 `expr` 的度数加 1
+    - 类似 `expr.withFoo("")` 的“转换表达式”的度数为 `expr` 的度数
+    - 变量的度数是所有赋值到该变量的表达式的最大度数
+
+    直观地说，调用 getter 的次数越多，度数就会增加。最终，度数达到报告阈值（属性 `trustRadius`）时，该表达式会被报告。计算的细节更加复杂，并考虑了常见的模式，如集合的使用（列表或数组中的对象具有与其容器相同的度数）、构建器模式以及看似不突破抽象边界的 getter。
+
+    请注意，该规则容易出现许多误报和低优先级警告。您可以增加 `trustRadius` 属性来大幅减少这些问题。默认的 `trustRadius` 为 1，对应于原始的迪米特法则（您只允许在不可信值上调用一个 getter）。给定某个 `trustRadius` 值：
+    - 度数小于或等于 `trustRadius` 的表达式不会被报告
+    - 度数恰好为 `trustRadius + 1` 的表达式会被报告，除非它们仅从当前方法返回或作为参数传递给另一个方法。如果没有这个例外，则无法从例如方法参数中提取任何信息。
+    - 度数严格大于 `trustRadius + 1` 的值不会被报告。直观地说，要获得度数为 `n > 1` 的值，必须使用度数为 `n - 1` 的表达式，因此如果度数 `n > trustRadius + 1`，则您正在使用某个度数为 `trustRadius + 1` 的值，该值将被报告。
+
+    另见参考资料：
+
+    * Andrew Hunt, David Thomas, and Ward Cunningham. The Pragmatic Programmer. From Journeyman to Master. Addison-Wesley Longman, Amsterdam, October 1999.
+    * K.J. Lieberherr and I.M. Holland. Assuring good style for object-oriented programs. Software, IEEE, 6(5):38–48, 1989.
+    * &lt;http://www.ccs.neu.edu/home/lieber/LoD.html>
+    * &lt;http://en.wikipedia.org/wiki/Law_of_Demeter>
+</description>
+<priority>3</priority>
+<example>
+    <![CDATA[
+public class Foo {
+    /**
+     * This example will result in one violation.
+     */
+    public void example(Bar b) { // b has degree 1
+        // `b.getC()` has degree 2, it's breaking a boundary of abstraction and so is reported.
+        b.getC().doIt();
+        // To respect the law of Demeter, Bar should encapsulate its
+        // C member more properly, eg by exposing a method like this:
+        b.callDoItOnC();
+
+        // a constructor call, not a method call.
+        D d = new D();
+        // this method call is ok, because we have create the new
+        // instance of D locally.
+        d.doSomethingElse();
+    }
+}
+            ]]>
+</example>
+</rule>
+
+<rule name="LogicInversion"
+      language="java"
+      since="5.0"
+      class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+      message="使用相反的操作符代替逻辑补充操作符。"
+      externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#logicinversion">
+<description>
+    使用相反的操作符代替逻辑补充操作符。
+</description>
+<priority>3</priority>
+<properties>
+    <property name="xpath">
+        <value>
+            <![CDATA[
+//UnaryExpression[@Operator='!']/InfixExpression[@Operator = ('==', '!=', '<', '>', '<=', '>=')]
+]]>
+        </value>
+    </property>
+</properties>
+<example>
+    <![CDATA[
+public boolean bar(int a, int b) {
+
+    if (!(a == b)) { // use !=
+         return false;
+     }
+
+    if (!(a < b)) { // use >=
+         return false;
+    }
+
+    return true;
+}
+]]>
+</example>
+</rule>
+
+<rule name="LoosePackageCoupling"
+      language="java"
+      since="5.0"
+      message="不建议在包层次结构 ''{1}'' 外部使用 ''{0}''；请使用推荐的类。"
+      class="net.sourceforge.pmd.lang.java.rule.design.LoosePackageCouplingRule"
+      externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#loosepackagecoupling">
+<description>
+    避免在包层次结构之外使用来自配置包层次结构的类，除非使用的是配置中允许的类之一。
+</description>
+<priority>3</priority>
+<example>
+    <![CDATA[
+package some.package;
+
+import some.other.package.subpackage.subsubpackage.DontUseThisClass;
+
+public class Bar {
+    DontUseThisClass boo = new DontUseThisClass();
+}
+]]>
+</example>
+</rule>
+
+<rule name="NcssCount"
+      language="java"
+      message="{0} ''{1}'' 的 NCSS 行数为 {2}。"
+      since="6.0.0"
+      class="net.sourceforge.pmd.lang.java.rule.design.NcssCountRule"
+      externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#ncsscount">
+<description>
+    此规则使用 NCSS（非注释源语句）度量来确定类、方法或构造函数的代码行数。NCSS 忽略注释和空行，仅计算实际语句。有关计算的更多详细信息，请参阅文档 {% jdoc java::lang.java.metrics.JavaMetrics#NCSS %}。
+</description>
+<priority>3</priority>
+<example>
+    <![CDATA[
+import java.util.Collections;       // +0
+import java.io.IOException;         // +0
+
+class Foo {                         // +1, total Ncss = 12
+
+  public void bigMethod()           // +1
+      throws IOException {
+    int x = 0, y = 2;               // +1
+    boolean a = false, b = true;    // +1
+
+    if (a || b) {                   // +1
+      try {                         // +1
+        do {                        // +1
+          x += 2;                   // +1
+        } while (x < 12);
+
+        System.exit(0);             // +1
+      } catch (IOException ioe) {   // +1
+        throw new PatheticFailException(ioe); // +1
+      }
+    } else {
+      assert false;                 // +1
+    }
+  }
+}
+]]>
+</example>
+</rule>
+
+<rule name="NPathComplexity"
+      language="java"
+      since="3.9"
+      message="{0} ''{1}'' 的 NPath 复杂度为 {2}，当前阈值为 {3}。"
+      class="net.sourceforge.pmd.lang.java.rule.design.NPathComplexityRule"
+      externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#npathcomplexity">
+<description>
+    方法的 NPath 复杂度是通过该方法的所有非循环执行路径的数量来衡量的。与圈复杂度计算方法中的决策点数量不同，NPath 计算的是从方法的开始到结束的完整路径数量。该度量呈指数增长，因为它乘以同一块代码中语句的复杂度。有关计算的更多详细信息，请参阅文档 {% jdoc java::lang.java.metrics.JavaMetrics#NPATH %}。
+
+    一般认为，复杂度达到 200 是需要采取措施以降低复杂度和提高可读性的点。
+</description>
+<priority>3</priority>
+<example>
+    <![CDATA[
+public class Foo {
+  public static void bar() { // Ncss = 252: reported!
+    boolean a, b = true;
+    try { // 2 * 2 + 2 = 6
+      if (true) { // 2
+        List buz = new ArrayList();
+      }
+
+      for(int i = 0; i < 19; i++) { // * 2
+        List buz = new ArrayList();
+      }
+    } catch(Exception e) {
+      if (true) { // 2
+        e.printStackTrace();
+      }
+    }
+
+    while (j++ < 20) { //  * 2
+      List buz = new ArrayList();
+    }
+
+    switch(j) { // * 7
+      case 1:
+      case 2: break;
+      case 3: j = 5; break;
+      case 4: if (b && a) { bar(); } break;
+      default: break;
+    }
+
+    do { // * 3
+        List buz = new ArrayList();
+    } while (a && j++ < 30);
+  }
+}
+ ]]>
+</example>
+</rule>
+
+<rule name="SignatureDeclareThrowsException"
+      language="java"
+      since="1.2"
+      message="方法/构造函数不应显式抛出 java.lang.Exception。"
+      class="net.sourceforge.pmd.lang.java.rule.design.SignatureDeclareThrowsExceptionRule"
+      externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#signaturedeclarethrowsexception">
+<description>
+    方法/构造函数不应显式抛出通用的 java.lang.Exception，因为这不明确哪些异常可能会从方法中抛出。这可能使得文档编写和理解这些模糊接口变得困难。应使用从 RuntimeException 派生的类或检查异常。
+</description>
+<priority>3</priority>
+<example>
+    <![CDATA[
+public void foo() throws Exception {
+}
+]]>
+</example>
+</rule>
+
+<rule name="SimplifiedTernary"
+      language="java"
+      since="5.4.0"
+      message="这个条件表达式可以用 || 或 &amp;&amp; 简化。"
+      class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+      externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#simplifiedternary">
+<description>
+    <![CDATA[
+报告形式为 `condition ? literalBoolean : foo` 或 `condition ? foo : literalBoolean` 的三元表达式。
+
+这些表达式可以简化如下：
+* `condition ? true : expr` 简化为 `condition || expr`
+* `condition ? false : expr` 简化为 `!condition && expr`
+* `condition ? expr : true` 简化为 `!condition || expr`
+* `condition ? expr : false` 简化为 `condition && expr`
+]]>
+</description>
+<priority>3</priority>
+<properties>
+    <property name="xpath">
+        <value>
+            <![CDATA[
+//ConditionalExpression[BooleanLiteral and not(NullLiteral)]
+]]>
+        </value>
+    </property>
+</properties>
+<example>
+    <![CDATA[
+public class Foo {
+    public boolean test() {
+        return condition ? true : something(); // can be as simple as return condition || something();
+    }
+
+    public void test2() {
+        final boolean value = condition ? false : something(); // can be as simple as value = !condition && something();
+    }
+
+    public boolean test3() {
+        return condition ? something() : true; // can be as simple as return !condition || something();
+    }
+
+    public void test4() {
+        final boolean otherValue = condition ? something() : false; // can be as simple as condition && something();
+    }
+
+    public boolean test5() {
+        return condition ? true : false; // can be as simple as return condition;
+    }
+}
+]]>
+</example>
+</rule>
+
+
+<rule name="SimplifyBooleanExpressions"
+      language="java"
+      since="1.05"
+      message="避免在布尔表达式中进行不必要的比较。"
+      class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+      externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#simplifybooleanexpressions">
+<description>
+    避免在布尔表达式中进行不必要的比较，这些比较没有实际意义，并且影响可读性。
+</description>
+<priority>3</priority>
+<properties>
+    <property name="xpath">
+        <value>
+            <![CDATA[
+//InfixExpression[@Operator = ("==", "!=")]/BooleanLiteral
+]]>
+        </value>
+    </property>
+</properties>
+<example>
+    <![CDATA[
+public class Bar {
+  // can be simplified to
+  // bar = isFoo();
+  private boolean bar = (isFoo() == true);
+
+  public isFoo() { return false;}
+}
+]]>
+</example>
+</rule>
+
+<rule name="SimplifyBooleanReturns"
+      language="java"
+      since="0.9"
+      message="这个 if 语句可以替换为 `{0}`。"
+      class="net.sourceforge.pmd.lang.java.rule.design.SimplifyBooleanReturnsRule"
+      externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#simplifybooleanreturns">
+<description>
+    避免在返回布尔值时使用不必要的 if-then-else 语句。可以直接返回条件测试的结果。
+</description>
+<priority>3</priority>
+<example>
+    <![CDATA[
+public boolean isBarEqualTo(int x) {
+    if (bar == x) {      // this bit of code...
+        return true;
+    } else {
+        return false;
+    }
+}
+
+public boolean isBarEqualTo(int x) {
+    return bar == x;    // can be replaced with this
+}
+]]>
+</example>
+</rule>
+
+<rule name="SimplifyConditional"
+      language="java"
+      since="3.1"
+      message="在使用 instanceof 之前不需要检查 null。"
+      class="net.sourceforge.pmd.lang.java.rule.design.SimplifyConditionalRule"
+      externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#simplifyconditional">
+<description>
+    在使用 instanceof 之前不需要检查 null；当给定 null 参数时，instanceof 关键字会返回 false。
+</description>
+<priority>3</priority>
+<example>
+    <![CDATA[
+class Foo {
+  void bar(Object x) {
+    if (x != null && x instanceof Bar) {
+      // just drop the "x != null" check
+    }
+  }
+}
+]]>
+</example>
+</rule>
+
+<rule name="SingularField"
+      language="java"
+      since="3.1"
+      message="或许可以用局部变量替换 ''{0}''。"
+      class="net.sourceforge.pmd.lang.java.rule.design.SingularFieldRule"
+      externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#singularfield">
+<description>
+    报告可以转换为局部变量的字段。这是因为在每个使用该字段的方法中，字段在第一次读取之前会被赋值。因此，可能无法观察到字段在方法调用之前的值，因此它可能不需要存储在封闭对象中。
+
+    限制：
+    * 目前只能检查私有字段。
+    * 该规则不考虑线程，因此在并发代码中可能会导致误报。这些误报最好通过抑制来处理（参见 `ignoredAnnotations` 属性）。
+</description>
+<priority>3</priority>
+<example>
+    <![CDATA[
+public class Foo {
+    private int x; // this will be reported
+
+    public int foo(int y) {
+       x = y + 5; // assigned before any read
+       return x;
+    }
+
+    public int fooOk(int y) {
+       int z = y + 5; // might as well be a local like here
+       return z;
+    }
+}
+]]>
+</example>
+</rule>
+
+<rule name="SwitchDensity"
+      language="java"
+      since="1.02"
+      message="在 switch 语句中，语句与标签的比率过高。考虑进行重构。"
+      class="net.sourceforge.pmd.lang.java.rule.design.SwitchDensityRule"
+      externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#switchdensity">
+<description>
+    在 switch 语句中，语句与标签的比率过高表明 switch 语句过于复杂。考虑将语句移动到新方法中或根据 switch 变量创建子类。
+</description>
+<priority>3</priority>
+<example>
+    <![CDATA[
+public class Foo {
+  public void bar(int x) {
+    switch (x) {
+      case 1: {
+        // lots of statements
+        break;
+      } case 2: {
+        // lots of statements
+        break;
+      }
+    }
+  }
+}
+]]>
+</example>
+</rule>
+
+<rule name="TooManyFields"
+      language="java"
+      since="3.0"
+      message="字段过多"
+      class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+      externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#toomanyfields">
+<description>
+    拥有过多字段的类可能变得难以管理，可以通过减少字段数量来重新设计，可能通过将相关字段分组到新对象中。例如，一个包含单独城市/州/邮政编码字段的类，可以将它们合并到一个 Address 字段中。
+</description>
+<priority>3</priority>
+<properties>
+    <property name="maxfields" type="Integer" description="Max allowable fields" min="1" max="1000" value="15"/>
+    <property name="xpath">
+        <value>
+            <![CDATA[
+//ClassDeclaration/ClassBody
+  [count(FieldDeclaration
+            [not(pmd-java:modifiers() = 'final')]
+            [not(pmd-java:modifiers() = 'static')]
+        ) > $maxfields]
+]]>
+        </value>
+    </property>
+</properties>
+<example>
+    <![CDATA[
+public class Person {   // too many separate fields
+   int birthYear;
+   int birthMonth;
+   int birthDate;
+   float height;
+   float weight;
+}
+
+public class Person {   // this is more manageable
+   Date birthDate;
+   BodyMeasurements measurements;
+}
+]]>
+</example>
+</rule>
+
+<rule name="TooManyMethods"
+      language="java"
+      since="4.2"
+      class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+      message="这个类的方法太多了，考虑进行重构。"
+      externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#toomanymethods">
+<description>
+    方法过多的类通常是重构的好候选者，以减少其复杂性并找到更细粒度的对象划分方法。
+</description>
+<priority>3</priority>
+<properties>
+    <property name="maxmethods" type="Integer" description="The method count reporting threshold" min="1" max="1000" value="10"/>
+    <property name="xpath">
+        <value>
+            <![CDATA[
+ //ClassDeclaration/ClassBody
+     [
+      count(MethodDeclaration[
+         not (
+                (starts-with(@Name,'get') or starts-with(@Name,'set') or starts-with(@Name,'is'))
+                and
+                count(Block/*) <= 1
+            )
+      ]) > $maxmethods
+   ]
+]]>
+        </value>
+    </property>
+</properties>
+</rule>
+
+<rule name="UselessOverridingMethod"
+      language="java"
+      since="3.3"
+      message="重写的方法仅仅调用了 super。"
+      class="net.sourceforge.pmd.lang.java.rule.design.UselessOverridingMethodRule"
+      externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#uselessoverridingmethod">
+<description>
+    重写的方法仅调用了在超类中定义的相同方法。
+</description>
+<priority>3</priority>
+<example>
+    <![CDATA[
+public void foo(String bar) {
+    super.foo(bar);      // why bother overriding?
+}
+
+public String foo() {
+    return super.foo();  // why bother overriding?
+}
+
+@Id
+public Long getId() {
+    return super.getId();  // OK if 'ignoreAnnotations' is false, which is the default behavior
+}
+]]>
+</example>
+</rule>
+
+<rule name="UseObjectForClearerAPI"
+      language="java"
+      since="4.2.6"
+      message="与其使用大量的 String 参数，不如考虑使用一个容器对象来存储这些值。"
+      class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+      externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#useobjectforclearerapi">
+<description>
+    当编写公共方法时，应该考虑到 API 的设计。如果你的方法是公共的，这意味着其他类会使用它，因此你希望（或需要）提供一个全面且可扩展的 API。如果将大量信息作为一系列简单的 Strings 传递，可以考虑使用一个对象来表示所有这些信息。你将获得一个更简单的 API（例如使用 `doWork(Workload workload)`，而不是繁琐的字符串系列），更重要的是，如果需要在某些时候传递额外的数据，你可以通过简单地修改或扩展 Workload 来实现，而无需修改 API。
+</description>
+<priority>3</priority>
+<properties>
+    <property name="xpath">
+        <value>
+            <![CDATA[
+//MethodDeclaration[pmd-java:modifiers() = 'public']
+    [count(FormalParameters/FormalParameter[pmd-java:typeIs('java.lang.String')]) > 3]
+]]>
+        </value>
+    </property>
+</properties>
+<example>
+    <![CDATA[
+public class MyClass {
+    public void connect(String username,
+        String pssd,
+        String databaseName,
+        String databaseAdress)
+        // Instead of those parameters object
+        // would ensure a cleaner API and permit
+        // to add extra data transparently (no code change):
+        // void connect(UserData data);
+    {
+
+    }
+}
+]]>
+</example>
+</rule>
+
+<rule name="UseUtilityClass"
+      language="java"
+      since="0.3"
+      message="所有方法都是静态的。考虑使用一个工具类代替。或者，你可以添加一个私有构造函数或将类设为抽象类，以消除此警告。"
+      class="net.sourceforge.pmd.lang.java.rule.design.UseUtilityClassRule"
+      externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#useutilityclass">
+<description>
+    对于只有静态方法的类，考虑将它们作为工具类。请注意，这不适用于抽象类，因为它们的子类可能包含非静态方法。此外，如果你希望这个类成为工具类，请记得添加一个私有构造函数以防止实例化。（注意，这种用法在 PMD 5.1.0 之前被称为 UseSingleton）。
+</description>
+<priority>3</priority>
+<example>
+    <![CDATA[
+public class MaybeAUtility {
+  public static void foo() {}
+  public static void bar() {}
+}
+]]>
+</example>
+</rule>
+
+<rule name="MutableStaticState"
+      language="java"
+      since="6.35.0"
+      message="不要使用非 final 且非私有的静态字段。"
+      class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+      externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_design.html#mutablestaticstate">
+<description>
+    非私有的静态字段应通过声明为 final 来使其成为常量（或不可变引用）。
+
+    非私有的非 final 静态字段破坏了封装，并可能导致难以发现的错误，因为这些字段可以从程序的任何地方修改。调用者可以轻松地访问和修改非私有非 final 静态字段，无法对访问或修改进行保护，也无法验证新设置的值。
+
+    如果你正在使用这个规则，则不需要使用规则 {% rule java/errorprone/AssignmentToNonFinalStatic %}。
+</description>
+<priority>3</priority>
+<properties>
+    <property name="xpath">
+        <value>
+            <![CDATA[
+//FieldDeclaration[pmd-java:modifiers() = "static"][not(pmd-java:modifiers() = ("private", "final"))]
+]]>
+        </value>
+    </property>
+</properties>
+<example>
+    <![CDATA[
+public class Greeter { public static Foo foo = new Foo(); ... }       // avoid this
+public class Greeter { public static final Foo FOO = new Foo(); ... } // use this instead
+]]>
+</example>
+</rule>
+
+        </ruleset>

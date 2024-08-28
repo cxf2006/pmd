@@ -1,0 +1,384 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<ruleset name="Multithreading"
+    xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+当处理多线程执行时，标记问题的规则。
+    </description>
+
+    <rule name="AvoidSynchronizedAtMethodLevel"
+          language="java"
+          since="3.0"
+          message="使用块级同步而非方法级同步。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_multithreading.html#avoidsynchronizedatmethodlevel">
+        <description>
+方法级同步在方法中添加新代码时可能会引发问题。块级同步有助于确保只有需要同步的代码才会被同步。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>//MethodDeclaration[pmd-java:modifiers() = "synchronized"]</value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+    // Try to avoid this:
+    synchronized void foo() {
+        // code, that doesn't need synchronization
+        // ...
+        // code, that requires synchronization
+        if (!sharedData.has("bar")) {
+            sharedData.add("bar");
+        }
+        // more code, that doesn't need synchronization
+        // ...
+    }
+    // Prefer this:
+    void bar() {
+        // code, that doesn't need synchronization
+        // ...
+        synchronized(this) {
+            if (!sharedData.has("bar")) {
+                sharedData.add("bar");
+            }
+        }
+        // more code, that doesn't need synchronization
+        // ...
+    }
+
+    // Try to avoid this for static methods:
+    static synchronized void fooStatic() {
+    }
+
+    // Prefer this:
+    static void barStatic() {
+        // code, that doesn't need synchronization
+        // ...
+        synchronized(Foo.class) {
+            // code, that requires synchronization
+        }
+        // more code, that doesn't need synchronization
+        // ...
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidThreadGroup"
+          language="java"
+          since="3.6"
+          message="避免使用 java.lang.ThreadGroup；它不是线程安全的。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_multithreading.html#avoidthreadgroup">
+        <description>
+虽然 java.lang.ThreadGroup 旨在用于线程环境，但它包含一些非线程安全的方法。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+  //ConstructorCall/ClassType[pmd-java:typeIs('java.lang.ThreadGroup')]
+| //MethodCall[@MethodName = 'getThreadGroup']
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Bar {
+    void buz() {
+        ThreadGroup tg = new ThreadGroup("My threadgroup");
+        tg = new ThreadGroup(tg, "my thread group");
+        tg = Thread.currentThread().getThreadGroup();
+        tg = System.getSecurityManager().getThreadGroup();
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidUsingVolatile"
+          language="java"
+          since="4.1"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          message="不推荐使用修饰符 volatile。"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_multithreading.html#avoidusingvolatile">
+        <description>
+'volatile' 关键字通常用于微调 Java 应用程序，因此需要对 Java 内存模型有很高的专业知识。此外，它的作用范围不太明确。因此，不应将 volatile 关键字用于维护和可移植性目的。
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath">
+                <value>//FieldDeclaration[pmd-java:modifiers() = "volatile"]</value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class ThrDeux {
+  private volatile String var1; // not suggested
+  private          String var2; // preferred
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="DoNotUseThreads"
+          language="java"
+          since="4.1"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          message="为了符合 J2EE 规范，Web 应用程序不应使用任何线程。"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_multithreading.html#donotusethreads">
+        <description>
+J2EE 规范明确禁止使用线程。线程是应由 J2EE 服务器管理和监控的资源。如果应用程序自行创建线程或使用自定义线程池，那么这些线程将不会被管理，可能导致资源耗尽。此外，EJB 可能会在集群中的机器之间移动，只有受管理的资源才能随之移动。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ClassType
+[pmd-java:typeIs('java.lang.Thread') or pmd-java:typeIs('java.util.concurrent.ExecutorService')]
+(: allow Thread.currentThread().getContextClassLoader() :)
+[not(parent::TypeExpression[parent::MethodCall[pmd-java:matchesSig('_#currentThread()')
+                                               and parent::MethodCall[pmd-java:matchesSig('_#getContextClassLoader()')]
+                                              ]
+                           ]
+)]
+(: exclude duplicated types on the same line :)
+ [not((parent::FieldDeclaration|parent::LocalVariableDeclaration)/VariableDeclarator/*[2][pmd-java:typeIs('java.lang.Thread') or pmd-java:typeIs('java.util.concurrent.ExecutorService')])
+ or
+  @BeginLine != (parent::FieldDeclaration|parent::LocalVariableDeclaration)/VariableDeclarator/ConstructorCall/ClassType/@BeginLine]
+|
+//MethodCall[*[1][not(pmd-java:nodeIs('MethodCall'))][pmd-java:nodeIs('Expression') and (pmd-java:typeIs('java.util.concurrent.Executors')
+   or pmd-java:typeIs('java.util.concurrent.ExecutorService'))]]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+// This is not allowed
+public class UsingThread extends Thread {
+
+}
+
+// Neither this,
+public class UsingExecutorService {
+
+    public void methodX() {
+        ExecutorService executorService = Executors.newFixedThreadPool(5);
+    }
+}
+
+// Nor this,
+public class Example implements ExecutorService {
+
+}
+
+// Nor this,
+public class Example extends AbstractExecutorService {
+
+}
+
+// Nor this
+public class UsingExecutors {
+
+    public void methodX() {
+        Executors.newSingleThreadExecutor().submit(() -> System.out.println("Hello!"));
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="DontCallThreadRun"
+          language="java"
+          since="4.3"
+          message="不要显式调用 Thread.run()，请使用 Thread.start()。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_multithreading.html#dontcallthreadrun">
+        <description>
+显式调用 Thread.run() 方法会在调用者的线程中执行。相反，请调用 Thread.start() 以实现预期的行为。
+        </description>
+        <priority>4</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodCall[ pmd-java:matchesSig("java.lang.Thread#run()") ]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+Thread t = new Thread();
+t.run();            // use t.start() instead
+new Thread().run(); // same violation
+]]>
+        </example>
+    </rule>
+
+    <rule name="DoubleCheckedLocking"
+          language="java"
+          since="1.04"
+          message="双重检查锁定在 Java 中不是线程安全的。"
+          class="net.sourceforge.pmd.lang.java.rule.multithreading.DoubleCheckedLockingRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_multithreading.html#doublecheckedlocking">
+        <description>
+当在 Java 中使用双重检查锁定模式时，可能会返回部分创建的对象。优化的 JRE 可能会在调用对象构造函数之前将引用分配给 baz 变量。
+
+注意：在 Java 5 中，如果将变量声明为 `volatile`，可以使双重检查锁定生效。
+
+更多详情请参考: &lt;http://www.javaworld.com/javaworld/jw-02-2001/jw-0209-double.html> 或 &lt;http://www.cs.umd.edu/~pugh/java/memoryModel/DoubleCheckedLocking.html>。
+        </description>
+        <priority>1</priority>
+        <example>
+<![CDATA[
+public class Foo {
+    /*volatile */ Object baz = null; // fix for Java5 and later: volatile
+    Object bar() {
+        if (baz == null) { // baz may be non-null yet not fully created
+            synchronized(this) {
+                if (baz == null) {
+                    baz = new Object();
+                }
+              }
+        }
+        return baz;
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="NonThreadSafeSingleton"
+          language="java"
+          since="3.4"
+          message="单例模式不是线程安全的。"
+          class="net.sourceforge.pmd.lang.java.rule.multithreading.NonThreadSafeSingletonRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_multithreading.html#nonthreadsafesingleton">
+        <description>
+非线程安全的单例可能会导致不良的状态变化。如果可能，尽量通过直接实例化对象来消除静态单例。静态单例通常是多余的，因为无论如何只存在一个实例。其他可能的解决方法包括同步整个方法或使用[按需初始化持有类](https://en.wikipedia.org/wiki/Initialization-on-demand_holder_idiom)。
+
+避免使用双重检查锁定模式。除非将变量声明为 `volatile`，否则 Java 内存模型不能保证其正常工作，这会带来不必要的性能损失。[参考](http://www.cs.umd.edu/~pugh/java/memoryModel/DoubleCheckedLocking.html)
+
+参见《Effective Java》第48条。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+private static Foo foo = null;
+
+//multiple simultaneous callers may see partially initialized objects
+public static Foo getFoo() {
+    if (foo==null) {
+        foo = new Foo();
+    }
+    return foo;
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UnsynchronizedStaticFormatter"
+          language="java"
+          since="6.11.0"
+          message="静态 Formatter 对象应以同步方式访问。"
+          class="net.sourceforge.pmd.lang.java.rule.multithreading.UnsynchronizedStaticFormatterRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_multithreading.html#unsynchronizedstaticformatter">
+        <description>
+`java.text.Format` 的实例通常不是线程安全的。Sun 建议为每个线程使用单独的格式化实例。如果多个线程必须访问一个静态格式化器，则必须在块级别对格式化器进行同步。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Foo {
+    private static final SimpleDateFormat sdf = new SimpleDateFormat();
+    void bar() {
+        sdf.format(); // poor, no thread-safety
+    }
+    void foo() {
+        synchronized (sdf) { // preferred
+            sdf.format();
+        }
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UseConcurrentHashMap"
+          language="java"
+          minimumLanguageVersion="1.5"
+          since="4.2.6"
+          message="如果你使用的是 Java 5 或更新版本，并且有并发访问的需求，应该使用 ConcurrentHashMap 实现。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_multithreading.html#useconcurrenthashmap">
+        <description>
+由于 Java 5 引入了一种为多线程访问设计的新 Map 实现，你可以在不阻塞其他线程的情况下高效地进行 Map 读取。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//VariableDeclarator[VariableId[pmd-java:typeIsExactly('java.util.Map')] and *[2][self::ConstructorCall and not(pmd-java:typeIs('java.util.concurrent.ConcurrentHashMap'))]]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class ConcurrentApp {
+  public void getMyInstance() {
+    Map map1 = new HashMap();           // fine for single-threaded access
+    Map map2 = new ConcurrentHashMap(); // preferred for use with multiple threads
+
+    // the following case will be ignored by this rule
+    Map map3 = someModule.methodThatReturnMap(); // might be OK, if the returned map is already thread-safe
+  }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UseNotifyAllInsteadOfNotify"
+          language="java"
+          since="3.0"
+          message="调用 Thread.notifyAll() 而不是 Thread.notify()。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_multithreading.html#usenotifyallinsteadofnotify">
+        <description>
+Thread.notify() 唤醒正在监视该对象的一个线程。如果有多个线程在监视，那么只会选择其中一个。选择的线程是任意的，因此通常调用 notifyAll() 更为安全。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodCall[@MethodName="notify" and ArgumentList[count(*) = 0]]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+  void bar() {
+    x.notify();
+    // If many threads are monitoring x, only one (and you won't know which) will be notified.
+    // use instead:
+    x.notifyAll();
+  }
+]]>
+        </example>
+    </rule>
+
+</ruleset>

@@ -1,0 +1,1812 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<ruleset name="Best Practices"
+    xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+强制执行普遍认可的最佳实践的规则。
+    </description>
+
+    <rule name="AbstractClassWithoutAbstractMethod"
+          language="java"
+          since="3.0"
+          message="该抽象类没有任何抽象方法"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.AbstractClassWithoutAbstractMethodRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#abstractclasswithoutabstractmethod">
+        <description>
+抽象类不包含任何抽象方法。抽象类通常意味着不完整的实现，应该由子类通过实现抽象方法来完成。如果该类仅作为基类使用（不打算直接实例化），可以提供受保护的构造函数以防止直接实例化。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public abstract class Foo {
+  void int method1() { ... }
+  void int method2() { ... }
+  // consider using abstract methods or removing
+  // the abstract modifier and adding protected constructors
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AccessorClassGeneration"
+          language="java"
+          since="1.04"
+          maximumLanguageVersion="10"
+          message="避免从构造函数所在类的外部通过私有构造函数进行实例化。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.AccessorClassGenerationRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#accessorclassgeneration">
+        <description>
+通过私有构造函数从构造函数所在类的外部进行实例化，通常会导致生成访问器类。可以通过工厂方法或取消构造函数的私有化来避免这种情况。生成的类文件实际上是一个接口，它允许访问类调用一个新的隐藏包范围构造函数，该构造函数将接口作为附加参数。这实际上将私有构造函数转换为包范围的构造函数，并且难以察觉。
+
+注意: 该规则仅在Java 10或更低版本中执行。自Java 11起，JEP 181: 基于嵌套的访问控制 已被实现，这意味着在Java 11及更高版本中，不再生成访问器类。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Outer {
+ void method(){
+  Inner ic = new Inner();//Causes generation of accessor class
+ }
+ public class Inner {
+  private Inner(){}
+ }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AccessorMethodGeneration"
+          language="java"
+          since="5.5.4"
+          maximumLanguageVersion="10"
+          message="考虑将该成员的可见性设置为包级别，以便从{0}访问它，而无需生成合成访问器方法。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.AccessorMethodGenerationRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#accessormethodgeneration">
+        <description>
+当从另一个类访问私有字段/方法时，Java编译器会生成包私有可见性的访问器方法。这会增加开销，并增加Android上的dex方法计数。可以通过将字段/方法的可见性从私有更改为包私有来避免这种情况。
+
+注意: 该规则仅在Java 10或更低版本中执行。自Java 11起，JEP 181: 基于嵌套的访问控制 已被实现，这意味着在Java 11及更高版本中，不再生成访问器类。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class OuterClass {
+    private int counter;
+    /* package */ int id;
+
+    public class InnerClass {
+        InnerClass() {
+            OuterClass.this.counter++; // wrong accessor method will be generated
+        }
+
+        public int getOuterClassId() {
+            return OuterClass.this.id; // id is package-private, no accessor method needed
+        }
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ArrayIsStoredDirectly"
+          language="java"
+          since="2.2"
+          message="用户提供的数组''{0}''被直接存储。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.ArrayIsStoredDirectlyRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#arrayisstoreddirectly">
+        <description>
+接收数组的构造函数和方法应克隆对象并存储副本。
+这可以防止用户未来对原始数组的更改产生影响。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Foo {
+    private String [] x;
+        public void foo (String [] param) {
+        // Don't do this, make a copy of the array at least
+        this.x=param;
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidMessageDigestField"
+          language="java"
+          since="6.18.0"
+          message="不应声明MessageDigest类型的字段，因为未同步的访问可能会导致问题。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#avoidmessagedigestfield">
+        <description>
+将MessageDigest实例声明为字段使得该实例可以被多个线程直接访问。应尽可能避免这种MessageDigest实例的共享，因为如果访问未正确同步，会导致错误的结果。只需在需要时创建一个新的实例并在局部使用它。创建新实例比同步对共享实例的访问要简单。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+//FieldDeclaration/ClassType[pmd-java:typeIs('java.security.MessageDigest')]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+import java.security.MessageDigest;
+public class AvoidMessageDigestFieldExample {
+    private final MessageDigest sharedMd;
+    public AvoidMessageDigestFieldExample() throws Exception {
+        sharedMd = MessageDigest.getInstance("SHA-256");
+    }
+    public byte[] calculateHashShared(byte[] data) {
+        // sharing a MessageDigest like this without synchronizing access
+        // might lead to wrong results
+        sharedMd.reset();
+        sharedMd.update(data);
+        return sharedMd.digest();
+    }
+
+    // better
+    public byte[] calculateHash(byte[] data) throws Exception {
+        MessageDigest md = MessageDigest.getInstance("SHA-256");
+        md.update(data);
+        return md.digest();
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidPrintStackTrace"
+          language="java"
+          since="3.2"
+          message="避免使用printStackTrace()；请改用日志记录器调用。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#avoidprintstacktrace">
+        <description>
+避免使用printStackTrace()；请改用日志记录器调用。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodCall[ pmd-java:matchesSig("java.lang.Throwable#printStackTrace()") ]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+class Foo {
+    void bar() {
+        try {
+            // do something
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidReassigningCatchVariables"
+          language="java"
+          since="6.27.0"
+          message="避免重新分配捕获的异常''{0}''"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.AvoidReassigningCatchVariablesRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#avoidreassigningcatchvariables">
+        <description>
+在catch语句中重新分配异常变量应予避免，原因如下：
+
+1.如果需要，可以轻松添加多重捕获，并且代码仍然可以编译。
+
+2.遵循最小惊讶原则，我们希望确保在catch语句中捕获的变量始终是try块中抛出的异常。
+        </description>
+        <priority>3</priority>
+        <example><![CDATA[
+public class Foo {
+    public void foo() {
+        try {
+            // do something
+        } catch (Exception e) {
+            e = new NullPointerException(); // not recommended
+        }
+
+        try {
+            // do something
+        } catch (MyException | ServerException e) {
+            e = new RuntimeException(); // won't compile
+        }
+    }
+}
+        ]]></example>
+    </rule>
+
+    <rule name="AvoidReassigningLoopVariables"
+          language="java"
+          since="6.11.0"
+          message="避免重新分配循环控制变量''{0}''"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.AvoidReassigningLoopVariablesRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#avoidreassigningloopvariables">
+        <description>
+重新分配循环变量可能导致难以发现的错误。应防止或限制这些变量的更改。
+
+在foreach循环中，通过foreachReassign属性配置：
+- deny: 报告循环体内对循环变量的任何重新分配。这是默认设置。
+- allow: 不检查循环变量。
+- firstOnly: 报告对循环变量的任何重新分配，但允许作为循环体中的第一条语句进行重新分配。
+			这在允许对值进行某种归一化或清理时很有用，但不允许其他任何更改。
+
+在for循环中，通过forReassign属性配置：
+- deny: 报告循环体内对控制变量的任何重新分配。这是默认设置。
+- allow: 不检查控制变量。
+- skip: 报告对控制变量的任何重新分配，但允许条件递增/递减（++，--，+=，-=）。这可以防止意外的重新分配或对控制变量的无条件递增。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Foo {
+  private void foo() {
+    for (String s : listOfStrings()) {
+      s = s.trim(); // OK, when foreachReassign is "firstOnly" or "allow"
+      doSomethingWith(s);
+
+      s = s.toUpper(); // OK, when foreachReassign is "allow"
+      doSomethingElseWith(s);
+    }
+
+    for (int i=0; i < 10; i++) {
+      if (check(i)) {
+        i++; // OK, when forReassign is "skip" or "allow"
+      }
+
+      i = 5;  // OK, when forReassign is "allow"
+
+      doSomethingWith(i);
+    }
+  }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidReassigningParameters"
+          language="java"
+          since="1.0"
+          message="避免重新分配参数，如''{0}''"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.AvoidReassigningParametersRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#avoidreassigningparameters">
+        <description>
+重新分配方法或构造函数的输入参数值是不推荐的，因为这会使代码更难以理解。代码通常是以参数值不会改变为前提来阅读的，赋值操作因此违反了最小惊讶原则。如果参数在方法的javadoc中有文档说明，并且新的内容与原始文档内容不同，这尤其成问题。
+
+应使用临时局部变量来代替。这允许你为变量指定一个新名称，使代码更易于理解。
+
+注意，这条规则适用于方法和构造函数。如果对一个形式参数有多个赋值，则仅报告第一次赋值。
+        </description>
+        <priority>2</priority>
+        <example>
+<![CDATA[
+public class Hello {
+  private void greet(String name) {
+    name = name.trim();
+    System.out.println("Hello " + name);
+
+    // preferred
+    String trimmedName = name.trim();
+    System.out.println("Hello " + trimmedName);
+  }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidStringBufferField"
+          language="java"
+          since="4.2"
+          message="StringBuffer可能会增长很多，因此可能成为内存泄漏的来源（如果拥有它的类具有较长的生命周期）。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#avoidstringbufferfield">
+        <description>
+StringBuffer/StringBuilder可能会显著增长，因此如果被持有在具有长生命周期的对象中，可能成为内存泄漏的来源。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//FieldDeclaration/ClassType[pmd-java:typeIs('java.lang.StringBuffer') or pmd-java:typeIs('java.lang.StringBuilder')]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+    private StringBuffer buffer;    // potential memory leak as an instance variable;
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="AvoidUsingHardCodedIP"
+          language="java"
+          since="4.1"
+          message="不要硬编码IP地址${variableName}"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.AvoidUsingHardCodedIPRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#avoidusinghardcodedip">
+        <description>
+硬编码IP地址的应用在某些情况下可能变得无法部署。将IP地址外部化是更可取的。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Foo {
+    private String ip = "127.0.0.1";     // not recommended
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="CheckResultSet"
+          language="java"
+          since="4.1"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.CheckResultSetRule"
+          message="始终检查ResultSet的navigation方法（next、previous、first、last）的返回值。"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#checkresultset">
+        <description>
+始终检查ResultSet的navigation方法（next、previous、first、last）的返回值。如果返回值为false，应妥善处理。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+Statement stat = conn.createStatement();
+ResultSet rst = stat.executeQuery("SELECT name FROM person");
+rst.next();     // what if it returns false? bad form
+String firstName = rst.getString(1);
+
+Statement stat = conn.createStatement();
+ResultSet rst = stat.executeQuery("SELECT name FROM person");
+if (rst.next()) {    // result is properly examined and used
+    String firstName = rst.getString(1);
+    } else  {
+        // handle missing data
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ConstantsInInterface"
+          language="java"
+          since="5.5"
+          message="在接口中使用常量是一种不良实践。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#constantsininterface">
+        <description>
+在接口中使用常量是一种不良实践。接口定义了类型，常量是实现细节，最好放在类或枚举中。如果常量最好视为枚举类型的成员，则应使用枚举类型导出它们。在其他情况下，考虑使用实用程序类。参见《Effective Java》中的“仅使用接口来定义类型”。
+        </description>
+        <priority>3</priority>
+        <properties>
+        <property name="ignoreIfHasMethods" type="Boolean" description="Whether to ignore constants in interfaces if the interface defines any methods" value="true"/>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ClassDeclaration[@Interface = true()][$ignoreIfHasMethods= false() or not(ClassBody/MethodDeclaration)]/ClassBody/FieldDeclaration
+ ]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public interface ConstantInterface {
+    public static final int CONST1 = 1; // violation, no fields allowed in interface!
+    static final int CONST2 = 1;        // violation, no fields allowed in interface!
+    final int CONST3 = 1;               // violation, no fields allowed in interface!
+    int CONST4 = 1;                     // violation, no fields allowed in interface!
+}
+
+// with ignoreIfHasMethods = false
+public interface AnotherConstantInterface {
+    public static final int CONST1 = 1; // violation, no fields allowed in interface!
+
+    int anyMethod();
+}
+
+// with ignoreIfHasMethods = true
+public interface YetAnotherConstantInterface {
+    public static final int CONST1 = 1; // no violation
+
+    int anyMethod();
+}
+ ]]>
+        </example>
+    </rule>
+
+    <rule name="DefaultLabelNotLastInSwitchStmt"
+          language="java"
+          since="1.5"
+          message="switch语句中的default标签应放在最后。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#defaultlabelnotlastinswitchstmt">
+        <description>
+根据惯例，default标签应放在switch语句的最后。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//SwitchLabel[@Default = true() and not(.. is ../../*[last()])]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+  void bar(int a) {
+   switch (a) {
+    case 1:  // do something
+       break;
+    default:  // the default case should be last, by convention
+       break;
+    case 2:
+       break;
+   }
+  }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="DoubleBraceInitialization"
+          language="java"
+          since="6.16.0"
+          message="应避免使用双括号初始化。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#doublebraceinitialization">
+        <description>
+双括号初始化是一种简洁地初始化集合等对象的模式。但它隐式地生成了一个新的.class文件，并且对象持有对外部对象的强引用。因此，尽管这种方法比较冗长，但最好还是正常初始化对象。
+
+此规则将任何只有单一初始化器的匿名类视为双括号初始化的实例。目前没有办法确定初始化器中调用的方法是否不可从匿名类外部访问，这些合法的情况应暂时被忽略。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+                    <![CDATA[
+//ConstructorCall/AnonymousClassDeclaration/ClassBody[count(*)=1]/Initializer[@Static=false()]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example><![CDATA[
+// this is double-brace initialization
+return new ArrayList<String>(){{
+    add("a");
+    add("b");
+    add("c");
+}};
+
+// the better way is to not create an anonymous class:
+List<String> a = new ArrayList<>();
+a.add("a");
+a.add("b");
+a.add("c");
+return a;
+]]>
+        </example>
+    </rule>
+
+    <rule name="ForLoopCanBeForeach"
+          language="java"
+          since="6.0.0"
+          message="这个for循环可以替换为foreach循环。"
+          minimumLanguageVersion="1.5"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.ForLoopCanBeForeachRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#forloopcanbeforeach">
+        <description>
+可以安全地用foreach语法替换的循环。此规则考虑了对列表、数组和迭代器的循环。如果一个循环仅使用索引变量访问列表或数组中的元素，只有一个更新语句，并且从左到右遍历了列表或数组中的每个元素，那么它可以安全地替换。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class MyClass {
+  void loop(List<String> l) {
+    for (int i = 0; i < l.size(); i++) { // pre Java 1.5
+      System.out.println(l.get(i));
+    }
+
+    for (String s : l) {        // post Java 1.5
+      System.out.println(s);
+    }
+  }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ForLoopVariableCount"
+          language="java"
+          since="6.11.0"
+          message="for语句中的控制变量过多。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#forloopvariablecount">
+        <description>
+在for循环中拥有大量控制变量会使人更难看清循环遍历的值范围。默认情况下，这条规则允许只有一个变量的常规for循环。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="maximumVariables" type="Integer"
+                      description="A regular for statement will have 1 control variable" min="0" max="100" value="1"/>
+            <property name="xpath">
+                <value>//ForInit/LocalVariableDeclaration[count(VariableDeclarator) > $maximumVariables]</value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+// this will be reported with the default setting of at most one control variable in a for loop
+for (int i = 0, j = 0; i < 10; i++, j += 2) {
+   foo();
+]]>
+        </example>
+    </rule>
+
+    <rule name="GuardLogStatement"
+          language="java"
+          since="5.1.0"
+          message="日志记录应该判断相应日志级别是否启用。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.GuardLogStatementRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#guardlogstatement">
+        <description>
+每当使用相应日志级别时，应检查该该日志级别是否实际启用，否则应跳过相关的字符串创建和处理。
+
+检查日志级别的替代方案包括使用参数替代、格式化器或懒加载日志（如使用lambda）。可用的替代方案取决于实际的日志框架。
+        </description>
+        <priority>2</priority>
+        <example>
+<![CDATA[
+// Add this for performance
+if (log.isDebugEnabled()) {
+    log.debug("log something" + param1 + " and " + param2 + "concat strings");
+}
+
+// Avoid the guarding if statement with substituting parameters
+log.debug("log something {} and {}", param1, param2);
+
+// Avoid the guarding if statement with formatters
+log.debug("log something %s and %s", param1, param2);
+
+// Avoid the guarding if statement with lazy logging and lambdas
+log.debug("log something expensive: {}", () -> calculateExpensiveLoggingText());
+]]>
+        </example>
+    </rule>
+
+    <rule name="JUnit4SuitesShouldUseSuiteAnnotation"
+          language="java"
+          since="4.0"
+          message="JUnit 4使用注解而不是suite方法。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#junit4suitesshouldusesuiteannotation">
+        <description>
+在JUnit 3中，测试套件通过suite()方法指示。在JUnit 4中，测试套件通过@RunWith(Suite.class)注解指示。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodDeclaration[@Name='suite' and ClassType[pmd-java:typeIs('junit.framework.Test')]]
+                   [not(.//ReturnStatement/*[pmd-java:typeIs('junit.framework.JUnit4TestAdapter')])]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class BadExample extends TestCase{
+
+    public static Test suite(){
+        return new Suite();
+    }
+}
+
+@RunWith(Suite.class)
+@SuiteClasses( { TestOne.class, TestTwo.class })
+public class GoodTest {
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="JUnit4TestShouldUseAfterAnnotation"
+          language="java"
+          since="4.0"
+          message="JUnit 4中的测试应使用@After注解进行清理操作，而JUnit 5中的测试应使用@AfterEach或@AfterAll注解。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#junit4testshoulduseafterannotation">
+        <description>
+在JUnit 3中，tearDown方法用于清理运行测试所需的所有数据实体。JUnit 4跳过了tearDown方法，并在每个测试运行后执行所有带有@After注解的方法。JUnit 5引入了@AfterEach和@AfterAll注解，分别用于在每个测试之后或在类中的所有测试之后执行方法。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodDeclaration[@Name='tearDown' and @Arity=0]
+    [not(ModifierList/Annotation[
+           pmd-java:typeIs('org.junit.After')
+        or pmd-java:typeIs('org.junit.jupiter.api.AfterEach')
+        or pmd-java:typeIs('org.junit.jupiter.api.AfterAll')
+        or pmd-java:typeIs('org.testng.annotations.AfterMethod')])]
+    (: Make sure this is a junit 4 class :)
+    [../MethodDeclaration[pmd-java:hasAnnotation('org.junit.Test')]]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class MyTest {
+    public void tearDown() {
+        bad();
+    }
+}
+public class MyTest2 {
+    @After public void tearDown() {
+        good();
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="JUnit4TestShouldUseBeforeAnnotation"
+          language="java"
+          since="4.0"
+          message="JUnit 4中的测试应使用@Before注解进行测试设置，而JUnit 5中的测试应使用@BeforeEach或@BeforeAll注解。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#junit4testshouldusebeforeannotation">
+        <description>
+在JUnit 3中，setUp方法用于设置运行测试所需的所有数据实体。JUnit 4跳过了setUp方法，并在所有测试之前执行所有带有@Before注解的方法。JUnit 5引入了@BeforeEach和@BeforeAll注解，分别用于在每个测试之前或在类中的所有测试之前执行方法。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodDeclaration[@Name='setUp' and @Arity=0]
+    [not(ModifierList/Annotation[
+           pmd-java:typeIs('org.junit.Before')
+        or pmd-java:typeIs('org.junit.jupiter.api.BeforeEach')
+        or pmd-java:typeIs('org.junit.jupiter.api.BeforeAll')
+        or pmd-java:typeIs('org.testng.annotations.BeforeMethod')])]
+    (: Make sure this is a junit 4 class :)
+    [../MethodDeclaration[pmd-java:hasAnnotation('org.junit.Test')]]
+
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class MyTest {
+    public void setUp() {
+        bad();
+    }
+}
+public class MyTest2 {
+    @Before public void setUp() {
+        good();
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="JUnit4TestShouldUseTestAnnotation"
+          language="java"
+          since="4.0"
+          message="执行测试的单元测试应使用@Test注解。在JUnit 5中，测试方法可能会使用@RepeatedTest、@TestFactory、@TestTemplate或@ParameterizedTest注解。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#junit4testshouldusetestannotation">
+        <description>
+在JUnit 3中，框架执行所有以test开头的方法作为单元测试。在JUnit 4中，仅执行带有@Test注解的方法。在JUnit 5中，测试应使用以下注解之一：@Test、@RepeatedTest、@TestFactory、@TestTemplate或@ParameterizedTest。在TestNG中，仅执行带有@Test注解的方法。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ClassDeclaration[matches(@SimpleName, $testClassPattern) or pmd-java:typeIs('junit.framework.TestCase')]
+    (: a junit 3 method :)
+    /ClassBody/MethodDeclaration[
+        @Visibility="public"
+        and starts-with(@Name, 'test')
+        and not(ModifierList/Annotation[
+          pmd-java:typeIs('org.junit.Test')
+          or pmd-java:typeIs('org.junit.jupiter.api.Test')
+          or pmd-java:typeIs('org.junit.jupiter.api.RepeatedTest')
+          or pmd-java:typeIs('org.junit.jupiter.api.TestFactory')
+          or pmd-java:typeIs('org.junit.jupiter.api.TestTemplate')
+          or pmd-java:typeIs('org.junit.jupiter.params.ParameterizedTest')
+          or pmd-java:typeIs('org.testng.annotations.Test')
+          ]
+        )
+    ]
+]]>
+                </value>
+            </property>
+            <property name="testClassPattern" type="Regex" description="The regex pattern used to identify test classes" value="Test" />
+        </properties>
+        <example>
+<![CDATA[
+public class MyTest {
+    public void testBad() {
+        doSomething();
+    }
+
+    @Test
+    public void testGood() {
+        doSomething();
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="JUnit5TestShouldBePackagePrivate"
+          language="java"
+          since="6.35.0"
+          message="JUnit 5 tests should be package-private."
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#junit5testshouldbepackageprivate">
+        <description><![CDATA[
+报告那些不是包私有的JUnit 5测试类和方法。与JUnit 4测试需要公共可见性以便被引擎运行不同，JUnit 5测试即使是包私有也可以被运行。将它们标记为包私有是一种良好的实践，有助于限制它们的可见性。
+
+测试方法通过使用@Test、@RepeatedTest、@TestFactory、@TestTemplate或@ParameterizedTest注解来识别。
+            ]]></description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ClassDeclaration[
+    (: a Junit 5 test class, ie, it has methods with the annotation :)
+    @Interface = false() and
+    ClassBody/MethodDeclaration
+    [ModifierList/Annotation[
+               pmd-java:typeIs('org.junit.jupiter.api.Test')
+            or pmd-java:typeIs('org.junit.jupiter.api.RepeatedTest')
+            or pmd-java:typeIs('org.junit.jupiter.api.TestFactory')
+            or pmd-java:typeIs('org.junit.jupiter.api.TestTemplate')
+            or pmd-java:typeIs('org.junit.jupiter.params.ParameterizedTest')
+    ]]
+]/(
+       self::*[@Abstract = false() and @Visibility = ("public", "protected")]
+|      ClassBody/MethodDeclaration
+       [@Visibility = ("public", "protected")]
+       [ModifierList/Annotation[
+               pmd-java:typeIs('org.junit.jupiter.api.Test')
+            or pmd-java:typeIs('org.junit.jupiter.api.RepeatedTest')
+            or pmd-java:typeIs('org.junit.jupiter.api.TestFactory')
+            or pmd-java:typeIs('org.junit.jupiter.api.TestTemplate')
+            or pmd-java:typeIs('org.junit.jupiter.params.ParameterizedTest')
+       ]]
+)
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+            <![CDATA[
+class MyTest { // not public, that's fine
+    @Test
+    public void testBad() { } // should not have a public modifier
+
+    @Test
+    protected void testAlsoBad() { } // should not have a protected modifier
+
+    @Test
+    private void testNoRun() { } // should not have a private modifier
+
+    @Test
+    void testGood() { } // package private as expected
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="JUnitAssertionsShouldIncludeMessage"
+          language="java"
+          since="1.04"
+          message="JUnit断言应包括一条消息。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.JUnitAssertionsShouldIncludeMessageRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#junitassertionsshouldincludemessage">
+        <description>
+JUnit断言应包括一条信息性消息——即使用`assertEquals()`的三参数版本，而不是两参数版本。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Foo extends TestCase {
+    public void testSomething() {
+        assertEquals("foo", "bar");
+        // Use the form:
+        // assertEquals("Foo does not equals bar", "foo", "bar");
+        // instead
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="JUnitTestContainsTooManyAsserts"
+          language="java"
+          since="5.0"
+          message="单元测试中不应包含超过${maximumAsserts}个断言。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.JUnitTestContainsTooManyAssertsRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#junittestcontainstoomanyasserts">
+        <description>
+单元测试中不应包含过多断言。许多断言可能表明测试过于复杂，从而更难验证其正确性。考虑将测试场景拆分为多个较短的测试场景。根据需要自定义此规则使用的最大断言数量。
+
+此规则适用于JUnit4、JUnit5和TestNG测试，以及以“test”开头的方法。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class MyTestCase extends TestCase {
+    // Ok
+    public void testMyCaseWithOneAssert() {
+        boolean myVar = false;
+        assertFalse("should be false", myVar);
+    }
+
+    // Bad, too many asserts (assuming max=1)
+    public void testMyCaseWithMoreAsserts() {
+        boolean myVar = false;
+        assertFalse("myVar should be false", myVar);
+        assertEquals("should equals false", false, myVar);
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="JUnitTestsShouldIncludeAssert"
+          language="java"
+          since="2.0"
+          message="JUnit测试应包含`assert()`或`fail()`。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.JUnitTestsShouldIncludeAssertRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#junittestsshouldincludeassert">
+        <description>
+JUnit测试应包含至少一个断言。这使测试更加稳健，并且使用带有消息的断言可以让开发者更清楚地了解测试的作用。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Foo extends TestCase {
+   public void testSomething() {
+      Bar b = findBar();
+   // This is better than having a NullPointerException
+   // assertNotNull("bar not found", b);
+   b.work();
+   }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="JUnitUseExpected"
+          language="java"
+          since="4.0"
+          message="在JUnit4中，使用`@Test(expected)`注解来表示应抛出异常的测试。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.JUnitUseExpectedRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#junituseexpected">
+        <description>
+在JUnit4中，使用`@Test(expected)`注解来标识应抛出异常的测试。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class MyTest {
+    @Test
+    public void testBad() {
+        try {
+            doSomething();
+            fail("should have thrown an exception");
+        } catch (Exception e) {
+        }
+    }
+
+    @Test(expected=Exception.class)
+    public void testGood() {
+        doSomething();
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="LiteralsFirstInComparisons"
+          language="java"
+          since="6.24.0"
+          message="在字符串比较中，将字面量放在前面。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.LiteralsFirstInComparisonsRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#literalsfirstincomparisons">
+        <description>
+在所有字符串比较中，将字面量放在前面。如果第二个参数为null，则可以避免NullPointerException，它们将仅返回false。注意，交换字面量的位置对于compareTo和compareToIgnoreCase可能会改变结果，见示例。
+        </description>
+        <priority>3</priority>
+        <example>
+            <![CDATA[
+class Foo {
+    boolean bar(String x) {
+        return x.equals("2"); // should be "2".equals(x)
+    }
+    boolean bar(String x) {
+        return x.equalsIgnoreCase("2"); // should be "2".equalsIgnoreCase(x)
+    }
+    boolean bar(String x) {
+        return (x.compareTo("bar") > 0); // should be: "bar".compareTo(x) < 0
+    }
+    boolean bar(String x) {
+        return (x.compareToIgnoreCase("bar") > 0); // should be: "bar".compareToIgnoreCase(x) < 0
+    }
+    boolean bar(String x) {
+        return x.contentEquals("bar"); // should be "bar".contentEquals(x)
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="LooseCoupling"
+          language="java"
+          since="0.7"
+          message="避免使用实现类型如''{0}''；应使用接口类型。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.LooseCouplingRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#loosecoupling">
+        <description>
+过度耦合到实现类型（例如HashSet）会限制你在需求变化时使用其他实现的能力。尽可能使用更通用的类型（例如Set）来声明变量和参数。
+
+此规则报告使用具体集合类型的情况。用户定义的类型如果应该像接口一样对待，可以通过allowedTypes属性进行配置。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+import java.util.ArrayList;
+import java.util.HashSet;
+
+public class Bar {
+    // sub-optimal approach
+    private ArrayList<SomeType> list = new ArrayList<>();
+
+    public HashSet<SomeType> getFoo() {
+        return new HashSet<SomeType>();
+    }
+
+    // preferred approach
+    private List<SomeType> list = new ArrayList<>();
+
+    public Set<SomeType> getFoo() {
+        return new HashSet<SomeType>();
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="MethodReturnsInternalArray"
+          language="java"
+          since="2.2"
+          message="返回''{0}''可能会暴露内部数组。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.MethodReturnsInternalArrayRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#methodreturnsinternalarray">
+        <description>
+将内部数组暴露给调用者违反了对象封装，因为元素可以在拥有该数组的对象之外被移除或替换。返回数组的副本更为安全。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class SecureSystem {
+    UserData [] ud;
+    public UserData [] getUserData() {
+        // Don't return directly the internal array, return a copy
+        return ud;
+    }
+}
+]]>
+        </example>
+    </rule>
+
+
+    <rule name="MissingOverride"
+          language="java"
+          since="6.2.0"
+          minimumLanguageVersion="1.5"
+          message="方法''{0}''缺少`@Override`注解。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.MissingOverrideRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#missingoverride">
+        <description>
+用`@Override`注解重写的方法可以在编译时确保该方法确实重写了一个父类的方法，这有助于重构并明确意图。
+        </description>
+        <priority>3</priority>
+        <example>
+            <![CDATA[
+            public class Foo implements Runnable {
+                // This method is overridden, and should have an @Override annotation
+                public void run() {
+
+                }
+            }
+            ]]>
+        </example>
+    </rule>
+
+    <rule name="OneDeclarationPerLine"
+          language="java"
+          since="5.0"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          message="每个声明使用一行，这可以提高代码的可读性。"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#onedeclarationperline">
+        <description>
+Java允许在一行上声明多个相同类型的变量。然而，这可能导致代码变得混乱。这条规则检查是否存在在同一行上声明多个变量的情况。
+        </description>
+        <priority>4</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//LocalVariableDeclaration
+   [not(parent::ForInit)]
+   [count(VariableDeclarator) > 1]
+   [$strictMode or count(distinct-values(VariableDeclarator/@BeginLine)) != count(VariableDeclarator)]
+|
+//FieldDeclaration
+   [count(VariableDeclarator) > 1]
+   [$strictMode or count(distinct-values(VariableDeclarator/@BeginLine)) != count(VariableDeclarator)]
+]]>
+                </value>
+            </property>
+            <property name="strictMode" type="Boolean" value="false"
+                      description="If true, mark combined declaration even if the declarations are on separate lines."/>
+        </properties>
+        <example>
+<![CDATA[
+String name;            // separate declarations
+String lastname;
+
+String name, lastname;  // combined declaration, a violation
+
+String name,
+       lastname;        // combined declaration on multiple lines, no violation by default.
+                        // Set property strictMode to true to mark this as violation.
+]]>
+        </example>
+    </rule>
+
+    <rule name="PreserveStackTrace"
+          language="java"
+          since="3.7"
+          message="抛出的异常在所有代码路径上未能保留异常''{0}''的堆栈跟踪。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.PreserveStackTraceRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#preservestacktrace">
+        <description>
+报告那些在`catch`块内抛出的异常，但未引用该`catch`块中声明的异常参数的情况。这样可能会丢失原始异常的堆栈跟踪，使得抛出的异常信息不够完整。
+
+为了保留堆栈跟踪，可以将原始异常用作新异常的原因，使用`Throwable#initCause`，或者作为构造函数参数传递给新异常。也可以使用`Throwable#addSuppressed`来保留堆栈跟踪。规则实际上假设任何方法或构造函数接受原始异常作为参数都会保留原始堆栈跟踪。
+
+规则允许将`InvocationTargetException`和`PrivilegedActionException`替换为其原因异常。在这些情况下，被丢弃的堆栈跟踪仅是JDK内部代码，不太有用。规则还忽略了名称以`ignored`开头的异常。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Foo {
+    void good() {
+        try{
+            Integer.parseInt("a");
+        } catch (Exception e) {
+            throw new Exception(e); // Ok, this initializes the cause of the new exception
+        }
+        try {
+            Integer.parseInt("a");
+        } catch (Exception e) {
+            throw (IllegalStateException)new IllegalStateException().initCause(e); // second possibility to create exception chain.
+        }
+    }
+    void wrong() {
+        try{
+            Integer.parseInt("a");
+        } catch (Exception e) {
+            // Violation: this only preserves the message and not the stack trace
+            throw new Exception(e.getMessage());
+        }
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="PrimitiveWrapperInstantiation"
+          language="java"
+          since="6.37.0"
+          message="不要使用`new {0}(...)`，请使用`{0}.valueOf(...)`。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.PrimitiveWrapperInstantiationRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#primitivewrapperinstantiation">
+        <description>
+报告对原始包装类构造函数的使用。这些构造函数自Java 9起已被弃用，不应再使用。即使在Java 9之前，它们也可以用相应的静态`valueOf`工厂方法替代（自Java 1.5起，编译器可能会自动插入）。这样做的好处是，它可能会重用常见实例，而不是每次都创建一个新实例。
+
+请注意，对于`Boolean`，应优先使用命名常量`Boolean.TRUE`和`Boolean.FALSE`，而不是`Boolean.valueOf`。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+            public class Foo {
+                private Integer ZERO = new Integer(0);      // violation
+                private Integer ZERO1 = Integer.valueOf(0); // better
+                private Integer ZERO1 = 0;                  // even better
+            }
+            ]]>
+        </example>
+    </rule>
+
+
+    <rule name="ReplaceEnumerationWithIterator"
+          language="java"
+          since="3.4"
+          message="考虑用更新的`java.util.Iterator`替代这个`Enumeration`。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#replaceenumerationwithiterator">
+        <description>
+考虑用更新的`java.util.Iterator`替代`Enumeration`的使用。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//ImplementsList/ClassType[pmd-java:typeIsExactly('java.util.Enumeration')]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo implements Enumeration {
+    private int x = 42;
+    public boolean hasMoreElements() {
+        return true;
+    }
+    public Object nextElement() {
+        return String.valueOf(i++);
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ReplaceHashtableWithMap"
+          language="java"
+          since="3.4"
+          message="考虑用更新的`java.util.Map`替代这个`Hashtable`。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#replacehashtablewithmap">
+        <description>
+如果不需要线程安全，考虑用更新的`java.util.Map`替代`Hashtable`的使用。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+                //ClassType[pmd-java:typeIsExactly('java.util.Hashtable')]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+    void bar() {
+        Hashtable h = new Hashtable();
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="ReplaceVectorWithList"
+          language="java"
+          since="3.4"
+          message="考虑用更新的java.util.List替代这个Vector。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#replacevectorwithlist">
+        <description>
+如果不需要线程安全操作，考虑用更新的java.util.ArrayList替代Vector的使用。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+                //ClassType[pmd-java:typeIs('java.util.Vector')]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+    void bar() {
+        Vector v = new Vector();
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="SimplifiableTestAssertion"
+          language="java"
+          since="6.37.0"
+          message="断言可以通过使用{0}来简化。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.SimplifiableTestAssertionRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#simplifiabletestassertion">
+        <description>
+报告可以使用更具体的断言方法来简化的测试断言。这可以提供更好的错误消息，并使断言更具可读性。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+import org.junit.Test;
+import static org.junit.Assert.*;
+
+class SomeTestClass {
+    Object a,b;
+    @Test
+    void testMethod() {
+        assertTrue(a.equals(b)); // could be assertEquals(a, b);
+        assertTrue(!a.equals(b)); // could be assertNotEquals(a, b);
+
+        assertTrue(!something); // could be assertFalse(something);
+        assertFalse(!something); // could be assertTrue(something);
+
+        assertTrue(a == b); // could be assertSame(a, b);
+        assertTrue(a != b); // could be assertNotSame(a, b);
+
+        assertTrue(a == null); // could be assertNull(a);
+        assertTrue(a != null); // could be assertNotNull(a);
+    }
+}
+            ]]>
+        </example>
+    </rule>
+
+    <rule name="SwitchStmtsShouldHaveDefault"
+          language="java"
+          since="1.0"
+          message="`switch`语句应是详尽的，添加`default`情况（或缺失的枚举分支）。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#switchstmtsshouldhavedefault">
+        <description>
+`switch`语句应是详尽的，以使其控制流更易于跟踪。这可以通过添加`default`情况来实现，或者如果`switch`是基于枚举类型的，确保每个枚举常量都有一个`switch`分支。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+                //SwitchStatement[@DefaultCase = false() and @ExhaustiveEnumSwitch = false()]
+            ]]></value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+class Foo {{
+    int x = 2;
+    switch (x) {
+      case 1: int j = 6;
+      case 2: int j = 8;
+      // missing default: here
+    }
+}}
+]]>
+        </example>
+    </rule>
+
+    <rule name="SystemPrintln"
+          language="java"
+          since="2.1"
+          message="使用System.out/System.err"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#systemprintln">
+        <description>
+对`System.out`/`System.err`的引用通常用于调试目的，可能会在生产代码中保留。通过使用日志记录器，可以根据需要启用或禁用这种行为（并按优先级控制），避免阻塞标准输出日志。
+        </description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodCall[ starts-with(@MethodName, 'print') ]
+  /FieldAccess[ @Name = ('err', 'out') ]
+  /TypeExpression[ pmd-java:typeIsExactly('java.lang.System') ]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+ <![CDATA[
+class Foo{
+    Logger log = Logger.getLogger(Foo.class.getName());
+    public void testA () {
+        System.out.println("Entering test");
+        // Better use this
+        log.fine("Entering test");
+    }
+}
+]]>
+        </example>
+    </rule>
+    <rule name="UnnecessaryVarargsArrayCreation"
+          language="java"
+          since="7.1.0"
+          message="对可变参数方法调用进行不必要的显式数组创建。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.UnnecessaryVarargsArrayCreationRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#unnecessaryvarargsarraycreation">
+        <description>
+            报告在预期可变参数时的显式数组创建。例如：
+            ```java
+            Arrays.asList(new String[] { "foo", "bar", });
+            ```
+            可以替换为：
+            ```java
+            Arrays.asList("foo", "bar");
+            ```
+        </description>
+        <priority>3</priority>
+        <example><![CDATA[
+import java.util.Arrays;
+
+class C {
+    static {
+        Arrays.asList(new String[]{"foo", "bar",});
+        // should be
+        Arrays.asList("foo", "bar");
+    }
+}
+            ]]></example>
+    </rule>
+
+
+    <rule name="UnusedAssignment"
+          language="java"
+          since="6.26.0"
+          message="分配给该变量的值从未使用或总是被覆盖。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.UnusedAssignmentRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#unusedassignment">
+        <description>
+			报告那些在被覆盖或超出作用域之前从未使用的变量赋值。未使用的赋值包括以下两种情况：
+
+			1.变量在赋值后从未被读取，或
+			2.分配的值总是被其他赋值在变量下一次读取之前覆盖。
+			
+			此规则跟踪this的字段赋值和当前类的静态字段赋值。这可能在时间敏感的并发代码中导致一些误报，这些情况规则无法检测到。
+
+			该规则可以通过标准的@SuppressWarnings("unused")标签来抑制。
+
+			此规则包含了UnusedLocalVariable和UnusedFormalParameter规则。这些违规情况在默认情况下被过滤掉，如果你已启用这些规则，可以通过reportUnusedVariables属性启用这些规则。名称以ignored或unused开头的变量被过滤掉，这是处理异常的标准做法。
+
+			限制：
+				1.规则当前无法知道哪些方法调用会抛出异常或抛出哪些异常。在try块的主体内，每个方法或构造函数调用都被假定会抛出异常。这可能导致漏报。唯一被假定会抛出异常的语言构造是throw语句，特别是诸如assert语句或在取消引用时抛出的NullPointerException被忽略。
+				2.规则无法解析跨构造函数的赋值，特别是在使用特殊的this(...)语法调用时。这可能导致漏报。
+			PMD 7中可能会部分放宽这两个限制。
+        </description>
+        <priority>3</priority>
+        <example>
+            <![CDATA[
+            class A {
+                // this field initializer is redundant,
+                // it is always overwritten in the constructor
+                int f = 1;
+
+                A(int f) {
+                    this.f = f;
+                }
+            }
+        ]]>
+        </example>
+        <example><![CDATA[
+class B {
+
+    int method(int i, int j) {
+        // this initializer is redundant,
+        // it is overwritten in all branches of the `if`
+        int k = 0;
+
+        // Both the assignments to k are unused, because k is
+        // not read after the if/else
+        // This may hide a bug: the programmer probably wanted to return k
+        if (i < j)
+            k = i;
+        else
+            k = j;
+
+        return j;
+    }
+
+}
+        ]]>
+
+        </example>
+        <example><![CDATA[
+class C {
+
+    int method() {
+        int i = 0;
+
+        checkSomething(++i);
+        checkSomething(++i);
+        checkSomething(++i);
+        checkSomething(++i);
+
+        // That last increment is not reported unless
+        // the property `checkUnusedPrefixIncrement` is
+        // set to `true`
+        // Technically it could be written (i+1), but it
+        // is not very important
+    }
+
+}
+        ]]>
+
+        </example>
+        <example><![CDATA[
+class C {
+
+    // variables that are truly unused (at most assigned to, but never accessed)
+    // are only reported if property `reportUnusedVariables` is true
+
+    void method(int param) { } // for example this method parameter
+
+    // even then, you can suppress the violation with an annotation:
+
+    void method(@SuppressWarning("unused") int param) { } // no violation, even if `reportUnusedVariables` is true
+
+    // For catch parameters, or for resources which don't need to be used explicitly,
+    // you can give a name that starts with "ignored" to ignore such warnings
+
+    {
+        try (Something ignored = Something.create()) {
+            // even if ignored is unused, it won't be flagged
+            // its purpose might be to side-effect in the create/close routines
+
+        } catch (Exception e) { // this is unused and will cause a warning if `reportUnusedVariables` is true
+            // you should choose a name that starts with "ignored"
+            return;
+        }
+    }
+
+}
+        ]]>
+
+        </example>
+    </rule>
+
+    <rule name="UnusedFormalParameter"
+          language="java"
+          since="0.8"
+          message="避免未使用的{0}参数，如''{1}''。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.UnusedFormalParameterRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#unusedformalparameter">
+        <description>
+报告方法和构造函数的参数，这些参数在方法体内未被引用。名称以ignored或unused开头的参数会被过滤掉。
+
+从公共方法中移除未使用的正式参数可能会在代码库中引起连锁反应。因此，默认情况下，此规则仅考虑私有方法。要包括非私有方法，请将checkAll属性设置为true。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Foo {
+    private void bar(String howdy) {
+        // howdy is not used
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UnusedLocalVariable"
+          language="java"
+          since="0.1"
+          message="避免未使用的局部变量，如''{0}''。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.UnusedLocalVariableRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#unusedlocalvariable">
+        <description>
+检测当局部变量被声明和/或赋值，但未被使用的情况。名称以`ignored`或`unused`开头的变量会被过滤掉。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Foo {
+    public void doSomething() {
+        int i = 5; // Unused
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UnusedPrivateField"
+          since="0.1"
+          language="java"
+          message="避免未使用的私有字段，如''{0}''。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.UnusedPrivateFieldRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#unusedprivatefield">
+        <description>
+检测私有字段被声明和/或赋值但未被使用的情况。
+
+自PMD 6.50.0起，如果字段被注解或封闭类有任何注解，则会忽略私有字段。注解通常启用某些框架（如依赖注入、模拟或例如Lombok），这些框架通过反射或其他方式使用这些字段。这种使用方式无法通过静态代码分析检测。之前，通过在“ignoredAnnotations”属性中列出注解，显式允许了这些框架，但这对于任何未显式考虑的框架容易产生误报。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Something {
+    private static int FOO = 2; // Unused
+    private int i = 5; // Unused
+    private int j = 6;
+    public int addOne() {
+        return j++;
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UnusedPrivateMethod"
+          language="java"
+          since="0.7"
+          message="避免未使用的私有方法，如''{0}''。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.UnusedPrivateMethodRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#unusedprivatemethod">
+        <description>
+未使用的私有方法检测会发现声明但未使用的私有方法。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Something {
+    private void foo() {} // unused
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UseCollectionIsEmpty"
+          language="java"
+          since="3.9"
+          message="将对`size() == 0`（或`size() != 0`、`size() &gt; 0`、`size() &lt; 1`）的调用替换为对`isEmpty()`的调用。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.UseCollectionIsEmptyRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#usecollectionisempty">
+        <description>
+`java.util.Collection`上的`isEmpty()`方法用于确定集合是否包含任何元素。与比较`size()`的值为0相比，`isEmpty()`方法更清晰地表达了意图。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class Foo {
+    void good() {
+        List foo = getList();
+        if (foo.isEmpty()) {
+            // blah
+        }
+    }
+
+    void bad() {
+        List foo = getList();
+        if (foo.size() == 0) {
+            // blah
+        }
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UseStandardCharsets"
+          language="java"
+          since="6.34.0"
+          minimumLanguageVersion="1.7"
+          message="请使用`StandardCharsets`常量。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#usestandardcharsets">
+        <description>
+从Java 7开始，`StandardCharsets`提供了常用字符集对象的常量，如UTF-8。使用这些常量更不易出错，并且相比于`Charset.forName(...)`，由于不需要扫描内部`Charset`缓存，可以提供微小的性能优势。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//MethodCall[@MethodName = 'forName'][pmd-java:typeIs('java.nio.charset.Charset')]
+    [
+        ArgumentList/StringLiteral
+            [@Image = ('"US-ASCII"', '"ISO-8859-1"', '"UTF-8"', '"UTF-16BE"', '"UTF-16LE"', '"UTF-16"')]
+    ]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class UseStandardCharsets {
+    public void run() {
+
+        // looking up the charset dynamically
+        try (OutputStreamWriter osw = new OutputStreamWriter(out, Charset.forName("UTF-8"))) {
+            osw.write("test");
+        }
+
+        // best to use StandardCharsets
+        try (OutputStreamWriter osw = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
+            osw.write("test");
+        }
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UseTryWithResources"
+          language="java"
+          minimumLanguageVersion="1.7"
+          since="6.12.0"
+          message="考虑使用`try-with-resources`语句来替代显式关闭资源。"
+          class="net.sourceforge.pmd.lang.java.rule.bestpractices.UseTryWithResourcesRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#usetrywithresources">
+        <description>
+Java 7引入了`try-with-resources`语句。这个语句确保每个资源在语句结束时被关闭，避免了在`finally`块中显式关闭资源的需要。此外，异常处理也得到了改进：如果在`try`块和`finally`块中都发生了异常，`try`块中的异常会被抑制。使用`try-with-resources`语句时，`try`块中抛出的异常会被保留。
+        </description>
+        <priority>3</priority>
+        <example>
+<![CDATA[
+public class TryWithResources {
+    public void run() {
+        InputStream in = null;
+        try {
+            in = openInputStream();
+            int i = in.read();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (in != null) in.close();
+            } catch (IOException ignored) {
+                // ignored
+            }
+        }
+
+        // better use try-with-resources
+        try (InputStream in2 = openInputStream()) {
+            int i = in2.read();
+        }
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="UseVarargs"
+          language="java"
+          minimumLanguageVersion="1.5"
+          since="5.0"
+          message="考虑对方法或构造函数使用`varargs`，尤其是当最后一个参数是数组时。"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#usevarargs">
+        <description>
+Java 5引入了varargs参数声明，用于方法和构造函数。这种语法糖为这些方法和构造函数的用户提供了灵活性，使他们无需处理数组的创建。
+
+字节数组在任何方法中以及public static void main(String[])方法中的字符串数组会被忽略。
+        </description>
+        <priority>4</priority>
+        <properties>
+            <property name="xpath">
+                <value>
+<![CDATA[
+//FormalParameters[not(parent::MethodDeclaration[@Overridden=true() or @MainMethod=true()])]
+  /FormalParameter[position()=last()]
+   [@Varargs=false()]
+   [ArrayType[not(PrimitiveType[@Kind = "byte"] or ClassType[pmd-java:typeIs('java.lang.Byte')])]
+    or VariableId[ArrayDimensions] and (PrimitiveType[not(@Kind="byte")] or ClassType[not(pmd-java:typeIs('java.lang.Byte'))])]
+]]>
+                </value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Foo {
+    public void foo(String s, Object[] args) {
+        // Do something here...
+    }
+
+    public void bar(String s, Object... args) {
+        // Ahh, varargs tastes much better...
+    }
+}
+]]>
+        </example>
+    </rule>
+
+    <rule name="WhileLoopWithLiteralBoolean"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule"
+          language="java"
+          since="6.13.0"
+          message="循环可以简化。"
+          externalInfoUrl="${pmd.website.baseurl}/pmd_rules_java_bestpractices.html#whileloopwithliteralboolean">
+        <description>
+`do {} while (true);` 需要在语句的末尾才能清楚地看到它是一个无限循环，而 `while (true) {}` 更易于理解。
+
+`do {} while (false);` 是多余的，如果需要一个内部变量作用域，使用一个代码块 `{}` 即可。
+
+`while (false) {}` 永远不会执行代码块，可以完全移除。
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+(: while loops with single boolean literal 'false', maybe parenthesized :)
+//WhileStatement/BooleanLiteral[@True = false()]
+|
+(: do-while loops with single boolean literal ('false' or 'true'), maybe parenthesized :)
+//DoStatement/BooleanLiteral
+|
+(: while loops with conditional or'ed boolean literals, maybe parenthesized :)
+//WhileStatement[(InfixExpression[@Operator = ('|', '||')])
+    (: no var access :)
+    [count(VariableAccess) = 0]
+    (: at least one false literal :)
+    [count(BooleanLiteral[@True = false()]) >= 1]]
+|
+(: while loops with conditional and'ed boolean literals, maybe parenthesized :)
+//WhileStatement[(InfixExpression[@Operator = ('&', '&&')])
+    (: at least one false literal :)
+    [count(BooleanLiteral[@True = false()]) >= 1]]
+|
+(: do-while loops with conditional or'ed boolean literals, maybe parenthesized :)
+//DoStatement[(InfixExpression[@Operator = ('|', '||')])
+    (: at least one true literal :)
+    [count(BooleanLiteral[@True = true()]) >= 1
+      (: or only boolean literal and no no var access :)
+      or count(BooleanLiteral) >= 1
+      and count(VariableAccess) = 0
+    ]]
+|
+(: do-while loops with conditional and'ed boolean literals, maybe parenthesized :)
+//DoStatement[(InfixExpression[@Operator = ('&', '&&')])
+    (: at least one false literal :)
+    [count(BooleanLiteral[@True = false()]) >= 1
+      (: or only boolean literal and no no var access :)
+      or count(BooleanLiteral) >= 1
+      and count(VariableAccess) = 0
+    ]]
+                ]]></value>
+            </property>
+        </properties>
+        <example>
+<![CDATA[
+public class Example {
+  {
+    while (true) { } // allowed
+    while (false) { } // disallowed
+    do { } while (true); // disallowed
+    do { } while (false); // disallowed
+    do { } while (false | false); // disallowed
+    do { } while (false || false); // disallowed
+  }
+}
+]]>
+        </example>
+    </rule>
+
+</ruleset>
